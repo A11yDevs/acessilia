@@ -178,6 +178,26 @@ def test_unavailable_error_survives_pickling() -> None:
     assert [url for url, _ in restored.causes] == [PRIMARY]
 
 
+def test_unavailable_error_does_not_claim_unavailability_for_a_contract_failure() -> None:
+    """#700: an endpoint that answered outside the contract was not unavailable."""
+    causes = [
+        (PRIMARY, ToolboxContractViolation("422 from the provider")),
+        (SECONDARY, ToolboxTimeout("slow")),
+    ]
+    error = ToolboxUnavailable(causes)
+
+    message = str(error)
+    assert message.startswith("No Toolbox provider completed the extraction (")
+    assert "No Toolbox endpoint available" not in message
+    assert "ToolboxContractViolation" in message
+    assert "ToolboxTimeout" in message
+
+    # ``__reduce__`` rebuilds from the causes, so the wording stays consistent.
+    restored = pickle.loads(pickle.dumps(error))
+    assert str(restored) == message
+    assert [url for url, _ in restored.causes] == [PRIMARY, SECONDARY]
+
+
 @pytest.mark.asyncio
 async def test_single_endpoint_raises_its_own_error() -> None:
     client = _OcrClient(base_url=PRIMARY)

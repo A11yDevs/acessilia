@@ -28,6 +28,26 @@ abertas. O orquestrador deixa de restaurar metas depois da execução.
   posterior, metas removidas e retomada de checkpoints atuais e antigos.
 - Decisão de contrato: [ADR-0031](../../docs/adr/0031-job-goals-and-plan-selection.pt-br.md).
 
+## 0.3.28 — a falha combinada da extração dual diz o que aconteceu (#700)
+
+Quando os dois providers falhavam com falhas de provider, o core já levantava
+`ToolboxUnavailable` com as duas causas, mas a mensagem sempre dizia
+`No Toolbox endpoint available`. Uma violação de contrato não é
+indisponibilidade: o provider foi alcançado e respondeu fora do contrato.
+- `ToolboxUnavailable` agora usa `No Toolbox provider completed the extraction`
+  quando qualquer causa é uma `ToolboxContractViolation`, mantendo as duas
+  causas e a ordem. Sem violação de contrato (timeout/rede), a redação padrão
+  não muda.
+- O contrato de falha combinada ficou documentado para as falhas permanentes:
+  um primário permanente (mídia não suportada, entrada inválida, autenticação)
+  falha antes de o secundário ser tentado; um secundário permanente com o
+  primário falho é levantado como o próprio erro tipado, com a falha do
+  primário como causa; nos demais casos o `ToolboxUnavailable` carrega as duas.
+- Testes fixam as duas ordens mistas (contrato no primário + timeout no
+  secundário e a inversa) no mesmo tipo/mensagem de erro, os dois casos de
+  violação de contrato, a redação inalterada para duas falhas de conectividade
+  e os três tipos permanentes do secundário.
+
 ## 0.3.26 — a violação de contrato é falha de provider no modo dual (#699)
 
 O extrator do core e a fusão do SDK classificavam de formas diferentes uma

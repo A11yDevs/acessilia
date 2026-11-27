@@ -522,8 +522,12 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 > unsupported media, invalid input or authentication) is permanent: from the
 > primary it fails the job. From the secondary it degrades when the primary's
 > result is in hand; when the primary failed, it is raised with the primary
-> failure as its cause. If both failures are provider failures, the core raises
-> a `ToolboxUnavailable` carrying both causes.
+> failure as its cause. A permanent primary fails before the secondary is
+> attempted. If both failures are provider failures, the core raises a
+> `ToolboxUnavailable` carrying both causes. When either cause is a contract
+> violation, its message says that no provider completed the extraction instead
+> of claiming that no endpoint was available: the provider was reached and
+> answered outside the contract (#700).
 >
 > The `status` case is what an injected or duck-typed client can produce; the
 > shipped transport rejects a non-`succeeded` answer before it reaches the
