@@ -62,7 +62,15 @@ owes per-source fairness, a public cancellation API and the memory/failure
 isolation decisions. Production keeps it at 1; the opt-in is separate from the
 size so changing one sizing value cannot enable multi-job mode. The queue
 factory and constructor revalidate the same invariant, so a settings object
-mutated after construction still cannot start a multi-job queue.
+mutated after construction still cannot start a multi-job queue. The bound is
+nominal and local to the queue instance: while a cancelled job's blocking work
+is still joining, `_can_start_item` admits one replacement, so up to
+`QUEUE_MAX_CONCURRENT + 1` items can be counted as processing during that
+transition; repeated cancellations remain capped. The model-call sizing
+describes the nominal `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` case, not that
+overlap, and a second replica would add its own queue.
+Process setup logs one warning when the mode is authorized; it is not repeated
+per queue or job.
 `MODEL_CALL_WORKERS` (default 4) bounds worker reservations across jobs and
 transient loops; `MODEL_CALL_MAX_PENDING` (default 4, or the larger
 `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY − MODEL_CALL_WORKERS` when unset

@@ -5,8 +5,9 @@ once per process, not per run. ``setup_process`` passes them the settings and
 the environment at startup, so the core reads neither: each entry point (the
 API, the CLI, the frontends' runner, the Telegram bot) calls it first.
 Once the logger is set up, it warns about each deprecated configuration
-name still in use (``deprecated_configuration``) and about model-call capacity
-too small for the queue's configured concurrency (#590).
+name still in use (``deprecated_configuration``), about model-call capacity
+too small for the queue's configured concurrency (#590) and about the
+experimental multi-job mode when it is explicitly authorized (#830).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from collections.abc import Mapping
 from backend.config.settings import (
     Settings,
     deprecated_configuration,
+    multi_job_execution_authorized,
     settings as default_settings,
 )
 
@@ -33,8 +35,9 @@ def setup_process(
     (the service's, by default) and ``environ`` (the process's): ``LOCALE``,
     then the shell's ``LANGUAGE``/``LC_ALL``/``LANG`` and C locale. The core
     reads no environment (ADR-0016, step 5). ``jobs_at_once`` lets the entry
-    point pass the queue's actual concurrency to the model-call capacity check;
-    it defaults to ``QUEUE_MAX_CONCURRENT``."""
+    point pass the queue's actual concurrency to the model-call capacity check
+    and the experimental multi-job warning; it defaults to
+    ``QUEUE_MAX_CONCURRENT``."""
     from acessilia_core.i18n import (
         configure_locales,
         configure_server_locale,
@@ -52,6 +55,7 @@ def setup_process(
     setup_logger(level=s.log_level, logs_dir=s.logs_dir)
     warn_deprecated_configuration(s, environment)
     warn_model_call_capacity(s, jobs_at_once=jobs_at_once)
+    warn_multi_job_experimental(s, jobs_at_once=jobs_at_once)
 
 
 #: The deprecation messages this process has logged. The runner and the API
@@ -62,6 +66,11 @@ _LOGGED_DEPRECATIONS: set[str] = set()
 #: Configuration warnings that must not be repeated when both the runner and
 #: the API set the process up (#590).
 _LOGGED_CONFIGURATION_WARNINGS: set[str] = set()
+
+#: Fixed key for the one-per-process experimental multi-job warning. It is
+#: separate from the message so a later call with another concurrency does not
+#: emit the alert again (#830).
+_MULTI_JOB_WARNING_KEY = "multi-job experimental"
 
 
 def warn_deprecated_configuration(
@@ -104,6 +113,38 @@ def warn_model_call_capacity(
     logger.warning(message)
 
 
+def warn_multi_job_experimental(
+    settings: Settings | None = None, *, jobs_at_once: int | None = None
+) -> None:
+    """Warn, once per process, when the experimental multi-job mode is active.
+
+    ``jobs_at_once`` defaults to ``QUEUE_MAX_CONCURRENT``. The warning is
+    emitted only when more than one job is authorized, so the normal
+    single-job deployment stays silent. The configured limit is local to one
+    queue instance and does not describe the transient cancellation overlap
+    (#830).
+    """
+    from acessilia_core.logger import logger
+
+    s = default_settings if settings is None else settings
+    jobs = s.queue_max_concurrent if jobs_at_once is None else jobs_at_once
+    if jobs <= 1 or not multi_job_execution_authorized(
+        jobs, s.queue_multi_job_experimental
+    ):
+        return
+    message = (
+        "multi-job queue execution is enabled experimentally: "
+        f"QUEUE_MAX_CONCURRENT={jobs}, and the limit is local to this queue "
+        "instance; per-source fairness, a public cancellation API and "
+        "memory/failure isolation from #238 W1 are still missing. "
+        "Use it only in controlled experiments."
+    )
+    if _MULTI_JOB_WARNING_KEY in _LOGGED_CONFIGURATION_WARNINGS:
+        return
+    _LOGGED_CONFIGURATION_WARNINGS.add(_MULTI_JOB_WARNING_KEY)
+    logger.warning(message)
+
+
 def _process_c_locale() -> str | None:
     """The language of the process C locale inherited from the shell, read
     without side effects (``locale.getlocale`` only reads the current state).
@@ -136,4 +177,5 @@ __all__ = [
     "setup_process",
     "warn_deprecated_configuration",
     "warn_model_call_capacity",
+    "warn_multi_job_experimental",
 ]

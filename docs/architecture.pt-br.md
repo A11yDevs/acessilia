@@ -65,7 +65,15 @@ decisões de isolamento de memória/falhas. A produção o mantém em 1; o opt-i
 separado do dimensionamento para que mudar um único valor de tamanho não habilite
 o modo multi-job. A fábrica e o construtor da fila revalidam a mesma invariante,
 de modo que um objeto de configuração mutado após a construção ainda não consegue
-iniciar uma fila multi-job. `MODEL_CALL_WORKERS` (padrão 4) limita as reservas de workers
+iniciar uma fila multi-job. O limite é nominal e local à instância da fila:
+enquanto o trabalho bloqueante de um job cancelado ainda está terminando,
+`_can_start_item` admite um substituto, então até
+`QUEUE_MAX_CONCURRENT + 1` itens podem ser contabilizados como em processamento
+nessa transição; cancelamentos repetidos continuam limitados. O dimensionamento
+de chamadas ao modelo descreve o caso nominal
+`QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY`, não essa sobreposição, e uma segunda
+réplica teria sua própria fila. A configuração do processo registra um aviso quando o modo é autorizado;
+ele não se repete por fila ou por job. `MODEL_CALL_WORKERS` (padrão 4) limita as reservas de workers
 entre jobs e loops transitórios; `MODEL_CALL_MAX_PENDING` (padrão 4, ou o maior
 valor `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY − MODEL_CALL_WORKERS` quando não
 definido ou -1) limita chamadas adicionais em espera. São configurações do processo,

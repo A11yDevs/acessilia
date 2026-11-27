@@ -32,6 +32,17 @@ MULTI_JOB_GATE_MESSAGE = (
 )
 
 
+def multi_job_execution_authorized(max_concurrent: int, opt_in: object) -> bool:
+    """Whether the explicit boolean opt-in authorizes more than one job.
+
+    The environment parser produces a bool, but programmatic callers can pass
+    any object. For more than one job, only the singleton ``True`` authorizes
+    the experimental mode; strings such as ``"false"`` and even ``"true"``
+    belong to the environment boundary and must not enable it by truthiness.
+    """
+    return max_concurrent <= 1 or opt_in is True
+
+
 @dataclass
 class Settings:
     bot_token: str = field(default_factory=lambda: os.getenv("BOT_TOKEN", ""))
@@ -673,7 +684,9 @@ class Settings:
         ``Settings`` mutated after construction is revalidated before it can
         start a queue (#830).
         """
-        if self.queue_max_concurrent > 1 and not self.queue_multi_job_experimental:
+        if not multi_job_execution_authorized(
+            self.queue_max_concurrent, self.queue_multi_job_experimental
+        ):
             raise ValueError(MULTI_JOB_GATE_MESSAGE)
 
     def model_call_admission_floor(self, jobs_at_once: int | None = None) -> int:

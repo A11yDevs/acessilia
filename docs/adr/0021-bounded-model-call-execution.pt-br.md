@@ -74,7 +74,11 @@ não torna a execução de vários jobs segura, por isso `QUEUE_MAX_CONCURRENT` 
 de 1 continua atrás do opt-in explícito `QUEUE_MULTI_JOB_EXPERIMENTAL=true` até
 que a #238 W1 forneça a justiça por origem, a API pública de cancelamento e as
 decisões de isolamento de memória/falhas (#830). A validação da configuração, a
-fábrica e o construtor da fila aplicam a mesma invariante.
+fábrica e o construtor da fila aplicam a mesma invariante. A fórmula é nominal e
+local à instância da fila: a sobreposição de cancelamento pode manter um item
+extra em processamento, e uma segunda réplica tem sua própria fila, então não é
+um limite entre réplicas. A configuração do processo registra um aviso quando o
+modo experimental é autorizado, não uma vez por fila ou por job.
 
 Uma rejeição é pressão de admissão, não saúde do provider. Ela é tentada uma vez
 de novo, como um timeout, sem consumir uma tentativa de resposta; se persistir, a
