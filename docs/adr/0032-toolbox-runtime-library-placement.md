@@ -33,6 +33,10 @@ Options considered:
    call it locally; a versioned capability exposes a bounded semantic
    operation; deployment groups compatible operations by resource needs.
    These are not one-to-one mappings.
+   An operation is a candidate PDDL action when it has independently relevant
+   preconditions/effects, contributes to an obligation, or requires a Core
+   strategy/acceptance/replanning decision. Technical substeps of one bounded
+   action stay internal; a function need not become a capability or an action.
 2. **Use the existing Toolbox process first.** Put migrated compositions in
    the internal `acessilia_toolbox.operations` package as the first slice
    needs it, with thin registered adapters. Do not copy Docstruct algorithms
@@ -47,6 +51,10 @@ Options considered:
    identity/version and the selected provider through existing registries,
    executor and adapter factories. A function calls another local function
    directly, without loopback REST/MCP or a second capability catalogue.
+   Reusing a public capability internally must preserve its required validation,
+   authorization, errors, cancellation, provenance and cache semantics where
+   applicable. This does not require recursive executor calls; admission must
+   avoid holding a slot while waiting on the same saturated pool.
    Cross-process work uses the published provider contract.
 5. **Keep workflow authority in the Core.** Goals, targets, semantic provider
    choices, alternatives, acceptance and replanning stay there. Operational
@@ -54,29 +62,47 @@ Options considered:
    results, typed failures and provenance. They do not create obligations or
    choose a workflow. Decompose legacy agents by responsibility; agents and
    their decisions remain in the Core.
+   Resolving a compatible implementation/instance or failing over infrastructure
+   under an authorized policy must preserve the requested semantics and
+   provider/version constraints. Replacing Docling with MinerU or OCR with VLM
+   is a semantic alternative, not an availability decision hidden in dispatch.
+   Use bounded operational DTOs, never the Core's complete `ProcessingManifest`
+   or its goals, obligations and attempts as a new capability's contract (#908).
 6. **Keep dependencies and releases explicit.** Toolbox runtime → Docstruct;
    Core → public SDK → capability contract. The runtime imports neither Core
    nor Core SDK. Release it with the Toolbox; pin Docstruct's wheel/hash and
    record runtime/provider/algorithm versions in provenance and cache identity.
    Install only the extras each image needs, from its lockfile.
+   In 0.3.0, Core may still use the contract/data representations permitted by
+   the [Docstruct import inventory](../architecture/docstruct-import-inventory.md).
+   Existing computational imports remain pinned migration debt; remove them
+   with each slice. This permits no new local algorithms or wider allowances
+   and does not anticipate the reference-only proposal in #914.
 7. **Migrate one semantic slice at a time.** Publish a compatible contract
    and implementation first, then switch its Core consumer with differential
    evidence, and shrink the transitional/import allowlists. Preserve required
    ids, metadata, target scope, failure semantics and checkpoint behavior.
    Batch small transformations where the contract permits; measure requests,
    bytes and latency before claiming a performance improvement.
+   Each slice declares repeat/recovery, effects, timeout and publication rules;
+   job, operation, input, cache and idempotency identities are not interchangeable.
+   Correlate observations with the processed input/context and contract versions;
+   Core must reject stale results before applying them, even when target ids match.
+   The [migration gates](../architecture/toolbox-runtime-placement.md#first-slice-and-acceptance-gates)
+   detail these requirements without introducing distributed idempotency here.
 
 ## Consequences and scope
 
 This decides placement and invocation for migrated operations. The SDK's
 current local operations stay transitional until their consumers migrate;
 it does not remove them by repackaging. Existing contracts remain the source
-of truth until the shared-contract decision is made. ADRs 0027–0029 retain
+of truth until the shared-contract decision is made. ADRs 0027–0030 retain
 their own `Proposed` status and unresolved scope.
 
 The first planned slice is `norm-fix`; existing `text.postprocess@1` has
 different output and behavior. The migration map separates reuse from new
-contracts and identifies owner/issues. No Docker topology, runtime behavior,
+contracts and identifies execution families, contract status and the responsible
+side. No Docker topology, runtime behavior,
 MCP transport or queue implementation changes in this decision PR.
 
 Current semaphore/threadpool admission and process-local operation joining

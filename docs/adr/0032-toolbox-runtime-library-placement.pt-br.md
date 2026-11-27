@@ -2,7 +2,7 @@
 
 Inglês: [English version](0032-toolbox-runtime-library-placement.md).
 
-- **Status:** Aceito
+- **Status:** Aceita
 - **Data:** 2026-11-27
 - **Componentes:** core, SDK, docstruct, Toolbox
 - **Issues:** [#913](https://github.com/A11yDevs/acessilia/issues/913), [#804](https://github.com/A11yDevs/acessilia/issues/804), [#639](https://github.com/A11yDevs/acessilia/issues/639), [#735](https://github.com/A11yDevs/acessilia/issues/735)
@@ -33,6 +33,11 @@ Alternativas consideradas:
    localmente; uma capacidade versionada expõe uma operação semântica
    delimitada; a implantação agrupa operações compatíveis por necessidades
    de recursos. Esses elementos não têm correspondência um a um.
+   Uma operação é candidata a ação PDDL quando tem precondições/efeitos
+   relevantes de forma independente, contribui para uma obrigação ou exige
+   decisão de estratégia/aceite/replanejamento do Core. Subpassos técnicos de
+   uma ação delimitada ficam internos; uma função não precisa virar capacidade
+   ou ação.
 2. **Começar pelo processo existente da Toolbox.** Colocar composições migradas
    no pacote interno `acessilia_toolbox.operations` quando a primeira fatia
    precisar dele, com adaptadores registrados finos. Não copiar algoritmos
@@ -49,24 +54,48 @@ Alternativas consideradas:
    identidade/versão da capacidade e o provider selecionado pelos registros,
    executor e fábricas de adaptadores existentes. Uma função chama outra
    função local diretamente, sem REST/MCP de retorno para si mesma ou um
-   segundo catálogo. Trabalho entre processos usa o contrato público do provider.
+   segundo catálogo. Reutilizar internamente uma capacidade pública deve
+   preservar suas garantias exigidas de validação, autorização, erros,
+   cancelamento, proveniência e cache, quando aplicáveis. Isso não exige
+   chamadas recursivas ao executor; a admissão deve evitar reter uma vaga
+   enquanto espera pelo mesmo pool saturado. Trabalho entre processos usa
+   o contrato público do provider.
 5. **Manter a autoridade do workflow no Core.** Objetivos, alvos, escolhas
    semânticas de provider, alternativas, aceite e replanejamento continuam
    nele. Composições operacionais executam um contrato explícito e delimitado
    e devolvem observações, resultados, falhas tipadas e proveniência. Não
    criam obrigações nem escolhem um workflow. Decompor agentes legados por
    responsabilidade; agentes e suas decisões continuam no Core.
+   Resolver uma implementação/instância compatível ou fazer failover de
+   infraestrutura sob política autorizada deve preservar a semântica solicitada
+   e as restrições de provider/versão. Trocar Docling por MinerU ou OCR por VLM
+   é uma alternativa semântica, não uma decisão de disponibilidade oculta no
+   despacho. Usar DTOs operacionais delimitados, nunca o `ProcessingManifest`
+   completo do Core ou seus objetivos, obrigações e tentativas como contrato
+   de uma nova capacidade (#908).
 6. **Explicitar dependências e releases.** Runtime da Toolbox → Docstruct;
    Core → SDK público → contrato da capacidade. O runtime não importa Core
    nem Core SDK. Publicá-lo junto com a Toolbox; fixar wheel/hash da Docstruct
    e registrar versões do runtime/provider/algoritmo na proveniência e na
    identidade do cache. Instalar apenas os extras de cada imagem, pelo lockfile.
+   Na 0.3.0, o Core ainda pode usar as representações de contrato/dados
+   permitidas pelo [inventário de imports da Docstruct](../architecture/docstruct-import-inventory.pt-br.md).
+   Imports computacionais existentes continuam dívida de migração fixada;
+   removê-los a cada fatia. Isso não permite novos algoritmos locais ou
+   ampliação de permissões nem antecipa a proposta de referências da #914.
 7. **Migrar uma fatia semântica de cada vez.** Publicar primeiro um contrato
    compatível e a implementação, depois trocar o consumidor no Core com
    evidência diferencial e reduzir as allowlists transitórias/de imports.
    Preservar ids, metadados, escopo dos alvos, semântica de falhas e retomada.
    Agrupar transformações pequenas quando o contrato permitir; medir chamadas,
    bytes e latência antes de afirmar uma melhoria de desempenho.
+   Cada fatia declara regras de repetição/recuperação, efeitos, timeout e
+   publicação; identidades de job, operação, entrada, cache e idempotência
+   não são intercambiáveis. Correlacionar observações à entrada/contexto
+   processados e às versões dos contratos; o Core deve rejeitar resultados obsoletos
+   antes de aplicá-los, mesmo quando os ids dos alvos coincidem.
+   Os [critérios de migração](../architecture/toolbox-runtime-placement.pt-br.md#primeira-fatia-e-critérios-de-aceite)
+   detalham esses requisitos sem introduzir idempotência distribuída aqui.
 
 ## Consequências e escopo
 
@@ -74,11 +103,12 @@ Esta decisão define localização e invocação das operações migradas. As
 operações locais atuais do SDK continuam transitórias até a migração dos
 consumidores; reorganizar pacotes não as elimina. Os contratos existentes
 continuam sendo a fonte de verdade até a decisão sobre contratos compartilhados.
-As ADRs 0027–0029 mantêm seu status `Proposed` e seu escopo ainda em discussão.
+As ADRs 0027–0030 mantêm seu status `Proposto` e seu escopo ainda em discussão.
 
 A primeira fatia planejada é `norm-fix`; `text.postprocess@1` tem saída e
 comportamento diferentes. O mapa de migração distingue reutilização de novos
-contratos e identifica donos/issues. Este PR de decisão não altera topologia
+contratos e identifica famílias de execução, estado do contrato e o lado
+responsável. Este PR de decisão não altera topologia
 Docker, comportamento do runtime, transporte MCP nem implementação de filas.
 
 A admissão atual por semáforo/threadpool e a junção de operações local ao
@@ -92,4 +122,4 @@ instalação isolada e testes diferenciais, além dos contratos de cada migraç�
 O inventário registra a guarda ausente de `acessilia_core` na Toolbox e seu
 encaminhamento; não afirma que ela já esteja implementada. Os donos dos
 componentes revisam esta decisão pelo processo de ADR antes do merge;
-`Aceito` descreve seu estado após o merge.
+`Aceita` descreve seu estado após o merge.

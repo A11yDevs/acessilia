@@ -9,6 +9,14 @@ em 2026-11-27: Acessilia `02678e5e` e
 O inventário descreve fontes/configuração, não a saúde nem os digests de imagens
 de uma implantação em execução. Não afirma benchmark ou mudança de topologia.
 
+A auditoria do Core começou em `02678e5e`. Esta branch documental passou por
+rebase sobre `689e555b` (incluindo #922/#923); as mudanças intermediárias cobrem
+documentação de duplicação e shims/testes de descontinuação de fórmulas.
+As classificações dos métodos, as três composições do SDK e a versão fixada da
+Docstruct foram conferidas nessa base. O hash anterior registra a base da
+auditoria, não afirma que a branch anteceda o rebase; as evidências da Toolbox
+continuam fixadas em `dac17c24`.
+
 ## Caminho de execução existente
 
 A [fábrica da aplicação](https://github.com/A11yDevs/acessilia-toolbox/blob/dac17c24ad709398a49418f1eb71493b22816660/src/acessilia_toolbox/api/app.py)
@@ -49,6 +57,7 @@ na [#639](https://github.com/A11yDevs/acessilia/issues/639) e na
 | Processo de API/executor da Toolbox | Adaptadores Python leves, normalização e algoritmos locais. A imagem padrão instala o wheel da Toolbox e Docstruct; extras opcionais selecionam dependências nativas/clientes. | Hospedeiro inicial de operações CPU compatíveis e delimitadas; sem salto adicional de servidor para chamar uma biblioteca local. |
 | Sidecars Docling, MinerU e OCR/modelos | Imagens, endpoints e volumes de modelos separados no Compose. | Manter runtimes ML/GPU isolados; migrar uma função pura não justifica instalar esses runtimes na imagem da API. |
 | Sidecars matemáticos, de renderização e validação | `math-speech`, `pdf-ua-render`, `verapdf-validate`; a configuração do gateway/upstream VLM é separada. | Reutilizar serviços especializados pelos adaptadores atuais; composições operacionais não precisam acrescentar outro sidecar. |
+| Providers de áudio e música | `piper-tts` com seu volume de modelos; `audiveris-serve` no profile opcional `music` do Compose. Os extras de pacote `audio` (`edge-tts`) e `music` (`homr`) são separados desses sidecars. | Reutilizar os providers existentes. Nenhum alvo inicial de migração exige esses extras; o build local da API no Compose não os habilita. |
 | MinIO e Valkey | Armazenamento de artefatos e cache de execução no Compose; fallback de filesystem tem modo explícito. | Esses serviços não estabelecem filas duráveis nem estado autoritativo de workflow. |
 
 Fontes: [Dockerfile](https://github.com/A11yDevs/acessilia-toolbox/blob/dac17c24ad709398a49418f1eb71493b22816660/Dockerfile),
@@ -74,6 +83,44 @@ settings e modelos de workflow. Uma requisição identifica alvos e opções
 delimitados; a validação do resultado rejeita ids ausentes, duplicados ou não
 solicitados antes de o Core aplicar observações. A validação genérica da saída
 de providers pelos schemas permanece na [Toolbox #117](https://github.com/A11yDevs/acessilia-toolbox/issues/117).
+
+## Fronteiras das composições migradas
+
+São requisitos para novas fatias, não afirmações de que o runtime atual já
+aplica todas as garantias.
+
+| Fronteira | Regra e exemplo |
+|---|---|
+| Função interna | Chamar uma função pura diretamente, por exemplo substituição Unicode ou conversão para tons de cinza. Ela não precisa de capacidade pública nem de ação PDDL própria. |
+| Capacidade delimitada | Um contrato versionado de normalização em lote pode compor funções privadas com contexto/I/O explícitos. Reutilizar outra capacidade pública deve preservar as garantias de validação, autorização, erro, cancelamento, proveniência e cache exigidas por seu contrato. Reutilização local não precisa entrar novamente no executor ou usar HTTP de retorno para si mesma. |
+| Ação/decisão do Core | Precondições/efeitos relevantes de forma independente, resultados de obrigações, alternativas de estratégia ou necessidades de aceite/replanejamento tornam uma operação candidata a ação planejada. Reconhecimento de fórmulas e uma conversão MathML necessária separadamente podem ser ações distintas; pré-processamento técnico pode ficar dentro do reconhecimento. Não ocultar escolhas de workflow numa composição Python. |
+
+Coordenar a granularidade das ações com a #640 e a ADR-0029 proposta. Uma
+família de implantação não determina o domínio de planejamento. Migrar
+`norm-fix` não exige reescrever todo o planejador antes.
+
+A escolha de provider/estratégia pertence ao Core (incluindo sua configuração
+explícita). Resolver uma implementação compatível, selecionar sua instância
+disponível ou fazer failover de infraestrutura só é permitido sob a política
+operacional autorizada, preservando restrições semânticas/de provider/versão e
+registrando a implementação usada. Disponibilidade não pode trocar Docling por
+MinerU ou OCR por VLM silenciosamente. Isso não aceita o escopo restante da
+[ADR-0030 proposta](../adr/0030-providers-compete-per-capability.pt-br.md).
+
+Uma composição não deve reter uma vaga de admissão enquanto espera trabalho
+dependente no mesmo pool saturado. Definir admissão limitada e propagação de
+timeouts/cancelamento; um threadpool sozinho não isola CPU/GIL ou memória.
+Considerar pools limitados ou processos antes de exigir imagem/serviço separado,
+justificando a separação com medidas de recursos ou necessidades de segurança/
+isolamento. É orientação preventiva, não um deadlock reproduzido.
+
+Durante a 0.3.0, o Core pode manter representações de contrato/dados para
+coordenação sob a [classificação e allowlist atuais](docstruct-import-inventory.pt-br.md).
+Imports existentes fora de contrato continuam dívida transitória fixada;
+remover a chamada computacional e sua permissão juntas quando a capacidade a
+substituir. Não ampliar essas exceções ou tratar acesso a dados como permissão
+para novos algoritmos locais. A separação integral por referências continua
+sendo a proposta #914.
 
 ## Mapa inicial de migração
 
@@ -112,17 +159,39 @@ Cada fatia deve:
 
 1. Publicar primeiro contratos compatíveis de entrada/saída/erro e um provider;
    incluir versões do runtime/provider/Docstruct no cache e na proveniência.
+   Preservar consumidores antigos e definir falha ou degradação explicitamente
+   autorizada e rollback para consumidor novo/Toolbox antiga, usando os
+   requisitos existentes de capacidades ([#848](https://github.com/A11yDevs/acessilia/issues/848)).
 2. Comprovar equivalência de algoritmo, metadados, alvos/ordem e checkpoints.
    Separar evidência de origem de envelopes de planejamento do Core ([#908](https://github.com/A11yDevs/acessilia/issues/908)).
-3. Trocar a chamada pública do SDK somente quando a capacidade existir;
+   Uma nova capacidade recebe DTOs/referências/opções delimitados, nunca o
+   `ProcessingManifest` completo com objetivos, obrigações ou tentativas.
+   Ela não precisa esperar toda a #908; manter validadores estritos e
+   identidades de schema inequívocas.
+3. Especificar regras de repetição/recuperação, efeitos colaterais, timeouts,
+   retenção/limpeza de artefatos e publicação, incluindo perda da resposta após
+   execução. Distinguir id de job, id de operação, identidade da entrada
+   processada, chave de cache e eventual chave de idempotência; junção/cache
+   local ao processo não é idempotência distribuída durável. Declarar limites
+   de itens/bytes do lote, tempo, concorrência e fronteiras de cancelamento.
+4. Correlacionar observações à operação, alvo, conteúdo/contexto processados,
+   versão da capacidade e proveniência. O Core deve verificar aplicabilidade
+   antes de atualizar o estado, rejeitando entrada/contexto obsoletos mesmo
+   que os ids coincidam; usar revisões/digests relevantes quando necessário,
+   sem impor um protocolo global. Reutilizar verificações de alvos da
+   [#843](https://github.com/A11yDevs/acessilia/issues/843) e coordenar invalidação
+   de conteúdo com a [#840](https://github.com/A11yDevs/acessilia/issues/840).
+   Versionar algoritmos/opções internos efetivos que afetam resultados e cache;
+   não se exige um evento para cada função privada.
+5. Trocar a chamada pública do SDK somente quando a capacidade existir;
    propagar falhas tipadas sem fallback computacional local. Preservar
    admissão limitada e cancelamento antes da publicação; não afirmar
    preempção a partir de um reconhecimento de cancelamento.
-4. Fechar a guarda ausente de imports do Core na Toolbox #172 antes de publicar
+6. Fechar a guarda ausente de imports do Core na Toolbox #172 antes de publicar
    código migrado do runtime. Reduzir permissões de métodos/imports e verificar
    instalações isoladas, contratos e saídas diferenciais. Mudar `HARNESS_FILES` exige o
    [fluxo existente de gravação de referências](../../tests/differential/README.pt-br.md).
-5. Medir chamadas por lote, bytes serializados e latência antes de escolher
+7. Medir chamadas por lote, bytes serializados, latência, CPU e memória antes de escolher
    outra divisão de implantação ou afirmar ganho de velocidade. A decisão de
    localização sozinha não comprova equivalência de saída nem melhor desempenho.
 

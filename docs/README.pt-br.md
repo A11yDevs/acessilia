@@ -43,15 +43,9 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 27. [Seleção de testes orientada pela arquitetura (modo observação)](testing/impact-selection.pt-br.md) — a matriz de dependências da #644, as regras por caminho e o job de CI somente observação que registra quais suítes uma alteração deveria acionar. (English: [English version](testing/impact-selection.md))
 28. [Variabilidade do baseline e sobreposição exaustiva](testing/variability.pt-br.md) — as medianas e faixas de três execuções e a diferença entre a análise exaustiva de subsunção por assinatura e a busca de similaridade limitada por cap. (English: [English version](testing/variability.md))
 29. [Experimento de CI: baseline, paralelo e seleção em observação](testing/ci-experiment.pt-br.md) — a primeira comparação de tempo de parede e job-minutes antes e depois da #762, com a decisão de manter a suíte completa como gate. (English: [English version](testing/ci-experiment.md))
+30. [Localização do runtime da Toolbox e primeiras fatias de migração](architecture/toolbox-runtime-placement.pt-br.md) — o inventário de fontes, as fronteiras de bibliotecas/implantação e os critérios de migração operacional da ADR-0032 (#913). (English: [English version](architecture/toolbox-runtime-placement.md))
 
 ---
-
-## Localização do runtime da Toolbox
-
-[Localização do runtime e primeiras fatias de migração](architecture/toolbox-runtime-placement.pt-br.md)
-registra o inventário de fontes, as fronteiras de bibliotecas/implantação e o
-mapa inicial de migração operacional da ADR-0032 (#913).
-Inglês: [English version](architecture/toolbox-runtime-placement.md).
 
 ## Arquitetura PDDL + Agno
 
