@@ -524,9 +524,16 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 > nenhum provider resolveria (por exemplo, mídia não suportada, entrada
 > inválida ou autenticação) é permanente: pelo primário, derruba o job. Pelo
 > secundário, degrada quando o resultado do primário está em mãos; quando o
-> primário falhou, ela é levantada com a falha do primário como causa. Se as
-> duas falhas forem de provider, o core levanta um `ToolboxUnavailable` com as
-> duas causas.
+> primário falhou, ela é levantada com a falha do primário como causa. Um
+> primário permanente falha antes de o secundário ser tentado. Se as duas
+> falhas forem de provider, o core levanta um `ToolboxUnavailable` com as duas
+> causas. Quando ao menos uma causa não for exclusivamente timeout ou
+> indisponibilidade (uma violação de contrato, um erro HTTP não mapeado como
+> 500, ou uma recusa de capacidade/catálogo), a mensagem compartilhada do SDK
+> diz que nenhum provider completou a requisição em vez de afirmar que nenhum
+> endpoint estava disponível (#700). A mensagem não afirma que o provider
+> executou a capacidade; as causas tipadas mantêm essa distinção. O contexto do
+> core é a extração, mas a exceção é genérica e usada por outras operações.
 >
 > O caso de `status` é o que um cliente injetado ou duck-typed pode produzir; o
 > transporte real rejeita uma resposta com `status` diferente de `succeeded`

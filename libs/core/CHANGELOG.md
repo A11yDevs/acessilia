@@ -27,6 +27,27 @@ longer restores goals after a run.
   execution, removed goals, and resumption of current and old checkpoints.
 - Contract decision: [ADR-0031](../../docs/adr/0031-job-goals-and-plan-selection.md).
 
+## 0.3.28 — the combined dual-extraction failure contract is explicit (#700)
+
+When both providers failed with provider failures, the core already raised
+`ToolboxUnavailable` with both causes, but the message came from the SDK and
+always said `No Toolbox endpoint available` — wrong when a cause was not
+exclusively a timeout or unavailability (a contract violation, an unmapped HTTP
+error such as 500, or a capability/catalog rejection). The SDK release that
+carries #700 selects the generic `No Toolbox provider completed the request`
+for those causes; this core release documents and tests the combined-failure
+contract that uses that wording. The message does not assert that the provider
+executed the capability; the typed causes keep that distinction.
+- The core extractor documents the permanent-failure contract: a permanent
+  primary (unsupported media, invalid input, authentication) fails before the
+  secondary is attempted; a permanent secondary with a failed primary is raised
+  as its own typed error, with the primary's failure as its cause; otherwise
+  `ToolboxUnavailable` carries both.
+- Tests pin the two mixed orders (contract violation and timeout in either
+  direction, plus an unmapped HTTP 500 against a timeout) to the same error
+  type/message, the both-contract case, the unchanged wording for connectivity-
+  only failures, and the three permanent secondary types.
+
 ## 0.3.26 — a contract violation is a provider failure in dual mode (#699)
 
 The core extractor and the SDK fusion classified a client-raised

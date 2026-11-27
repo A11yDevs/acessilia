@@ -125,7 +125,15 @@ class ToolboxManifestExtractor:
     no provider would solve (for example unsupported media, invalid input or
     authentication) is permanent: from the primary it fails the job; from the
     secondary it degrades when the primary's result is in hand, and when the
-    primary failed it is raised with the primary failure as its cause.
+    primary failed it is raised with the primary failure as its cause. A
+    permanent primary fails before the secondary is attempted. When both
+    failures are provider failures, the combined error is a
+    ``ToolboxUnavailable`` carrying both causes; if either cause is not
+    exclusively a timeout or unavailability (a contract violation, an unmapped
+    HTTP error such as 500, or a capability/catalog rejection), its message says
+    no provider completed the request instead of claiming that no endpoint was
+    available. The typed causes still distinguish what happened; the message
+    does not assert that the provider executed the capability (#700).
     """
 
     def __init__(
@@ -567,6 +575,18 @@ class ToolboxManifestExtractor:
         # With the primary's result in hand the comparison is only a gain, so
         # any secondary failure degrades instead of discarding a complete extraction.
         if primary_error is not None:
+            # Combined-failure contract (#700). No primary result survived, so
+            # the run can only fail:
+            # - a permanent secondary rejection (unsupported media, invalid
+            #   input, authentication) is the typed error to raise, with the
+            #   primary failure chained; a permanent primary already failed fast
+            #   in _extract_primary, before this secondary ran;
+            # - otherwise both are provider failures (timeout, unavailable, an
+            #   unmapped HTTP error, or a contract violation, in either order),
+            #   and ToolboxUnavailable carries both causes. When a cause is not
+            #   exclusively a timeout/unavailability, its message says no
+            #   provider completed the request instead of claiming
+            #   unavailability.
             if not _provider_failure(exc):
                 raise exc from primary_error
             raise ToolboxUnavailable(

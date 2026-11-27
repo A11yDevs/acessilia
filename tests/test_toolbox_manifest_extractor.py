@@ -18,7 +18,7 @@ from acessilia_core.manifest.toolbox_extractor import (
     ToolboxExtraction,
     ToolboxManifestExtractor,
 )
-from acessilia_sdk.toolbox import ToolboxContractViolation, ToolboxTimeout
+from acessilia_sdk.toolbox import ToolboxContractViolation, ToolboxError, ToolboxTimeout
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 from tests.core_config_support import fusion_config, paths_config, toolbox_config
 
@@ -875,6 +875,7 @@ def test_dual_extraction_handles_each_provider_independently(
         with pytest.raises(ToolboxUnavailable) as info:
             extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
         assert len(info.value.causes) == 2
+        assert str(info.value).startswith("No Toolbox endpoint available (")
     else:
         result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
         assert result.configuration["toolbox_provider"] == ("docling" if primary_ok else "mineru")
@@ -1007,22 +1008,94 @@ def test_dual_mode_raises_when_both_providers_raise_a_client_contract_violation(
         )
 
     assert [exc for _, exc in caught.value.causes] == [primary_error, secondary_error]
+    message = str(caught.value)
+    assert message.startswith("No Toolbox provider completed the request (")
+    assert "No Toolbox endpoint available" not in message
     secondary.close.assert_awaited_once()
 
 
-def test_dual_mode_preserves_permanent_secondary_error_without_primary(mock_client, monkeypatch):
-    from acessilia_sdk.toolbox.errors import ToolboxTimeout, ToolboxUnsupportedMediaType
+@pytest.mark.parametrize(
+    ("primary_failure", "secondary_failure"),
+    [
+        (
+            ToolboxContractViolation("422 from docling"),
+            ToolboxTimeout("mineru timed out"),
+        ),
+        (
+            ToolboxTimeout("docling timed out"),
+            ToolboxContractViolation("422 from mineru"),
+        ),
+        (
+            ToolboxError("500 from docling"),
+            ToolboxTimeout("mineru timed out"),
+        ),
+    ],
+    ids=[
+        "primary-contract-secondary-timeout",
+        "primary-timeout-secondary-contract",
+        "primary-http-500-secondary-timeout",
+    ],
+)
+def test_dual_mode_combines_mixed_provider_failures(
+    mock_client, monkeypatch, primary_failure, secondary_failure
+):
+    """#700: either mixed order raises the same documented combined error."""
+    from acessilia_sdk.toolbox import ToolboxProviderUnavailable, ToolboxUnavailable
+
+    mock_client.extract_structure.side_effect = primary_failure
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.base_url = "http://secondary.test"
+    secondary.extract_structure.side_effect = secondary_failure
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: secondary,
+    )
+
+    with pytest.raises(ToolboxUnavailable) as caught:
+        ToolboxManifestExtractor(client=mock_client).extract(
+            FIXTURE_PDF,
+            fusion=fusion_config(mode="dual", secondary_provider="mineru"),
+            toolbox=toolbox_config(use_artifact_store=False),
+            paths=paths_config(),
+            operations=None,
+        )
+
+    error = caught.value
+    assert isinstance(error, ToolboxProviderUnavailable)
+    assert [exc for _, exc in error.causes] == [primary_failure, secondary_failure]
+    message = str(error)
+    assert message.startswith("No Toolbox provider completed the request (")
+    assert "No Toolbox endpoint available" not in message
+    assert "docling" in message and "mineru" in message
+    assert type(primary_failure).__name__ in message
+    assert type(secondary_failure).__name__ in message
+    secondary.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("failure_name", [
+    "ToolboxUnsupportedMediaType", "ToolboxInvalidInput",
+    "ToolboxAuthenticationError",
+])
+def test_dual_mode_preserves_permanent_secondary_error_without_primary(
+    mock_client, monkeypatch, failure_name
+):
+    """#700: a permanent rejection outranks the primary's provider failure."""
+    from acessilia_sdk.toolbox import errors
+    from acessilia_sdk.toolbox.errors import ToolboxTimeout
 
     primary_error = ToolboxTimeout("primary unavailable")
+    secondary_error = getattr(errors, failure_name)("permanent rejection")
     mock_client.extract_structure.side_effect = primary_error
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.provider = "mineru"
-    secondary.extract_structure.side_effect = ToolboxUnsupportedMediaType("unsupported document")
+    secondary.extract_structure.side_effect = secondary_error
     monkeypatch.setattr(
         "acessilia_core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
     )
-    with pytest.raises(ToolboxUnsupportedMediaType) as caught:
+    with pytest.raises(type(secondary_error)) as caught:
         ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
+    assert caught.value is secondary_error
     assert caught.value.__cause__ is primary_error
     secondary.close.assert_awaited_once()
 

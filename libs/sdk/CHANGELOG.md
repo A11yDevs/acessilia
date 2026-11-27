@@ -7,6 +7,16 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Changed** `ToolboxUnavailable` now chooses a message that fits its causes
+  instead of always claiming unavailability. When at least one cause is not
+  exclusively a timeout or an unavailable instance (for example a
+  `ToolboxContractViolation`, the bare `ToolboxError` of an unmapped HTTP 500,
+  or a capability/catalog rejection), the message is
+  `No Toolbox provider completed the request (...)`. The wording is generic
+  across capabilities and does not assert that the provider executed the
+  request; the typed causes keep that distinction. `causes` still lists every
+  failure and its order, and the default wording for timeout/network causes is
+  unchanged (#700).
 - **Docs** `extract_dual_fused` now states that every `ToolboxError` degrades,
   a contract violation included, and that the core extractor classifies a
   contract violation the same way in dual mode while its permanent document

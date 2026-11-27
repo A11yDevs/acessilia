@@ -16,6 +16,7 @@ from acessilia_sdk.toolbox import (
     ToolboxCapabilityClient,
     ToolboxContractViolation,
     ToolboxEndpoint,
+    ToolboxError,
     ToolboxIncompatibleEndpoint,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
@@ -164,6 +165,7 @@ async def test_reports_every_cause_when_all_instances_fail() -> None:
                 await client._execute("document.ocr", artifact_id="a1")
         assert [url for url, _ in info.value.causes] == [PRIMARY, SECONDARY]
         assert PRIMARY in str(info.value) and SECONDARY in str(info.value)
+        assert str(info.value).startswith("No Toolbox endpoint available (")
         # Callers that already catch ProviderUnavailable keep working.
         assert isinstance(info.value, ToolboxProviderUnavailable)
     finally:
@@ -172,10 +174,100 @@ async def test_reports_every_cause_when_all_instances_fail() -> None:
 
 def test_unavailable_error_survives_pickling() -> None:
     error = ToolboxUnavailable([(PRIMARY, ToolboxTimeout("slow"))])
+    assert str(error).startswith("No Toolbox endpoint available (")
     restored = pickle.loads(pickle.dumps(error))
     assert type(restored) is ToolboxUnavailable
     assert str(restored) == str(error)
     assert [url for url, _ in restored.causes] == [PRIMARY]
+
+
+@pytest.mark.parametrize(
+    ("causes", "prefix"),
+    [
+        (
+            [
+                (PRIMARY, ToolboxContractViolation("422 from the provider")),
+                (SECONDARY, ToolboxTimeout("slow")),
+            ],
+            "No Toolbox provider completed the request (",
+        ),
+        (
+            [
+                (PRIMARY, ToolboxTimeout("slow")),
+                (SECONDARY, ToolboxContractViolation("422 from the provider")),
+            ],
+            "No Toolbox provider completed the request (",
+        ),
+        (
+            [
+                (PRIMARY, ToolboxError("500 from the provider")),
+                (SECONDARY, ToolboxTimeout("slow")),
+            ],
+            "No Toolbox provider completed the request (",
+        ),
+        (
+            [
+                (PRIMARY, ToolboxTimeout("slow")),
+                (SECONDARY, ToolboxError("500 from the provider")),
+            ],
+            "No Toolbox provider completed the request (",
+        ),
+        (
+            [
+                (PRIMARY, ToolboxArtifactNotFound("no such artifact")),
+                (SECONDARY, ToolboxTimeout("slow")),
+            ],
+            "No Toolbox provider completed the request (",
+        ),
+        (
+            [
+                (PRIMARY, ToolboxTimeout("slow")),
+                (SECONDARY, ToolboxIncompatibleEndpoint("capability not published")),
+            ],
+            "No Toolbox provider completed the request (",
+        ),
+        (
+            [
+                (PRIMARY, ToolboxTimeout("slow")),
+                (SECONDARY, ToolboxProviderUnavailable("down")),
+            ],
+            "No Toolbox endpoint available (",
+        ),
+    ],
+    ids=[
+        "contract-then-timeout",
+        "timeout-then-contract",
+        "http-500-then-timeout",
+        "timeout-then-http-500",
+        "artifact-not-found-then-timeout",
+        "timeout-then-incompatible",
+        "timeout-then-unavailable",
+    ],
+)
+def test_unavailable_error_message_reflects_the_causes(
+    causes: list[tuple[str, ToolboxError]], prefix: str
+) -> None:
+    """#700: the shared exception stays generic and keeps every typed cause."""
+    error = ToolboxUnavailable(causes)
+
+    message = str(error)
+    assert message.startswith(prefix)
+    assert "extraction" not in message
+
+    # The causes keep their identity, type and primary-first order.
+    assert [exc for _, exc in error.causes] == [exc for _, exc in causes]
+    for url, exc in causes:
+        assert url in message
+        assert type(exc).__name__ in message
+
+    # ``__reduce__`` rebuilds from the causes, so the wording stays consistent.
+    restored = pickle.loads(pickle.dumps(error))
+    assert type(restored) is ToolboxUnavailable
+    assert str(restored) == message
+    assert [url for url, _ in restored.causes] == [url for url, _ in causes]
+    assert [type(exc) for _, exc in restored.causes] == [
+        type(exc) for _, exc in causes
+    ]
 
 
 @pytest.mark.asyncio
@@ -310,6 +402,7 @@ async def test_incompatible_secondary_is_skipped(catalog, reason) -> None:
         assert not secondary.called
         assert isinstance(info.value.causes[1][1], ToolboxIncompatibleEndpoint)
         assert "_Incompatible" not in str(info.value)
+        assert str(info.value).startswith("No Toolbox provider completed the request (")
     finally:
         await client.close()
 
@@ -618,6 +711,10 @@ async def test_artifact_download_searches_another_endpoint_after_not_found(
                 if secondary_status == "timeout":
                     assert isinstance(caught.value.causes[0][1], ToolboxArtifactNotFound)
                     assert isinstance(caught.value.causes[1][1], ToolboxTimeout)
+                    assert str(caught.value).startswith(
+                        "No Toolbox provider completed the request ("
+                    )
+                    assert "extraction" not in str(caught.value)
                 assert destination.read_bytes() == b"previous complete file"
             assert first.call_count == second.call_count == 1
             assert list(tmp_path.iterdir()) == [destination]
