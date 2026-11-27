@@ -94,6 +94,11 @@ Four things are decided separately: where document computation **runs**, who
 
 ### Ownership: the operational runtime belongs to the Toolbox
 
+[ADR-0032](0032-toolbox-runtime-library-placement.md) defines the placement of
+migrated operations: local libraries within appropriate deployment families,
+with the [source inventory and first slices](../architecture/toolbox-runtime-placement.md).
+It does not settle this proposal's remaining contract and migration decisions.
+
 - The SDK is split physically (#639):
   - **`acessilia-core-sdk`**: the generic capability client, contracts as
     consumed, transport, authentication, typed errors, artifact references.

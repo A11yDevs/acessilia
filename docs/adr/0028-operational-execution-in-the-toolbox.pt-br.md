@@ -96,6 +96,11 @@ onde ficam os **contratos**.
 
 ### Ownership: o runtime operacional pertence à Toolbox
 
+A [ADR-0032](0032-toolbox-runtime-library-placement.pt-br.md) define a localização
+das operações migradas: bibliotecas locais em famílias adequadas de implantação,
+com [inventário de fontes e primeiras fatias](../architecture/toolbox-runtime-placement.pt-br.md).
+Ela não resolve as decisões pendentes de contratos e migração desta proposta.
+
 - O SDK é separado fisicamente (#639):
   - **`acessilia-core-sdk`**: o cliente genérico de capacidades, os contratos
     como consumidos, transporte, autenticação, erros tipados e referências de

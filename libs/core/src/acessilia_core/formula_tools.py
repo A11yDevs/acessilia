@@ -15,10 +15,10 @@ libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py and ADR-0007).
 
 from __future__ import annotations
 
-import warnings
 from typing import Any
 
 import docstruct.text.latex as _docstruct_latex
+from acessilia_core.pipeline._deprecations import _deprecated_attribute
 
 _DEPRECATED_NAMES = ("ensure_math_delimiters", "normalize_latex")
 _DEPRECATED: dict[str, Any] = {
@@ -26,8 +26,8 @@ _DEPRECATED: dict[str, Any] = {
     "normalize_latex": _docstruct_latex.bare_latex,
 }
 _REPLACEMENTS = {
-    "ensure_math_delimiters": "ensure_math_delimiters",
-    "normalize_latex": "bare_latex",
+    "ensure_math_delimiters": "ensure_math_delimiters from docstruct.text.latex",
+    "normalize_latex": "bare_latex from docstruct.text.latex",
 }
 
 __all__ = [
@@ -42,15 +42,7 @@ def __dir__() -> list[str]:
 
 
 def __getattr__(name: str) -> Any:
-    if name in _DEPRECATED:
-        warnings.warn(
-            f"acessilia_core.formula_tools.{name} is deprecated; "
-            f"import {_REPLACEMENTS[name]} from docstruct.text.latex",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return _DEPRECATED[name]
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return _deprecated_attribute(__name__, name, _REPLACEMENTS, _DEPRECATED)
 
 
 def wrap_latex(latex: str, display: bool = False) -> str:

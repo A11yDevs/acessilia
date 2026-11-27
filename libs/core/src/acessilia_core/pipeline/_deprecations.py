@@ -1,23 +1,37 @@
-"""Shared deprecation shim for pipeline compatibility modules."""
+"""Shared deprecation shim for the core's compatibility modules."""
 
 from __future__ import annotations
 
 import warnings
+from collections.abc import Mapping
 from typing import Any
 
 
 def _deprecated_attribute(
     module_name: str,
     name: str,
-    replacement: str,
-    values: dict[str, Any],
+    replacement: str | Mapping[str, str],
+    values: Mapping[str, Any],
 ) -> Any:
-    """Return a deprecated module attribute, warning once per access."""
-    if name in values:
-        warnings.warn(
-            f"{module_name}.{name} is deprecated; import it from {replacement}",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        return values[name]
-    raise AttributeError(f"module {module_name!r} has no attribute {name!r}")
+    """Return a deprecated module attribute, warning once per access.
+
+    ``replacement`` is either the module every name moved to, or a mapping from
+    each name to the exact import text (a name, possibly with its module), for
+    shims whose replacements do not share one fixed module. A mapping must
+    cover every entry in ``values``; a missing entry fails with a clear
+    ``RuntimeError`` instead of the bare ``KeyError``.
+    """
+    if name not in values:
+        raise AttributeError(f"module {module_name!r} has no attribute {name!r}")
+    if isinstance(replacement, Mapping):
+        try:
+            import_text = replacement[name]
+        except KeyError:
+            raise RuntimeError(
+                f"{module_name}.{name} is deprecated but has no replacement text"
+            ) from None
+        message = f"{module_name}.{name} is deprecated; import {import_text}"
+    else:
+        message = f"{module_name}.{name} is deprecated; import it from {replacement}"
+    warnings.warn(message, DeprecationWarning, stacklevel=3)
+    return values[name]
