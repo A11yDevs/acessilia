@@ -40,10 +40,31 @@ def _staging_snapshot():
     )
 
 
+def _staging_snapshot_without(capability_id):
+    """The staging snapshot with one capability unpublished."""
+    payload = json.loads(CONTRACT_SNAPSHOT.read_text(encoding="utf-8"))
+    capabilities = [
+        item for item in payload["capabilities"] if item["id"] != capability_id
+    ]
+    return snapshot_from_payloads(capabilities, payload["providers"], fetched_at=0.0)
+
+
 def _fuse_manifest(methods=FUSE_METHODS):
     obligation = _obligation("fuse-providers", ["el-1"], methods)
     obligation.method_costs = {m: DEFAULT_METHOD_COSTS[m] for m in methods}
     return _manifest([_element("el-1", "paragraph", text="texto")], [obligation])
+
+
+def _prefer_dual_manifest():
+    """The fused extraction is cheaper, so only the catalogue can remove it."""
+    manifest = _fuse_manifest()
+    obligation = manifest.obligations[0]
+    obligation.method_costs = {
+        "dual-provider-fusion": 5,
+        "single-provider": 20,
+        "human-review": 100,
+    }
+    return manifest
 
 
 def _config(*, secondary="mineru", gate="enforce"):
@@ -139,6 +160,56 @@ class _CountingCache:
     async def get(self):
         self.calls += 1
         return self.snapshot
+
+
+@pytest.mark.asyncio
+async def test_the_default_mode_plans_from_a_real_catalogue_end_to_end(monkeypatch) -> None:
+    """#937: the production path (decide -> facts -> planner) decides the plan.
+
+    The cache read and the Toolbox are stubbed; the gate, the problem compiler
+    and the planner are real. Removing a required provider or capability, or
+    the whole snapshot, must change the selected method.
+    """
+    orchestrator = _orchestrator()
+    manifest = _prefer_dual_manifest()
+
+    async def plan(config, snapshot, error=None):
+        cache = _CountingCache(snapshot)
+        cache.last_error = error
+        monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda _toolbox: cache)
+        decision = await toolbox_gate.decide(manifest, config)
+        plan, _ = orchestrator._build_plan(
+            manifest, catalogue=decision.catalogue_facts()
+        )
+        return decision, [step.method for step in plan.steps if step.method]
+
+    decision, methods = await plan(_config(), _staging_snapshot())
+    assert decision.offered
+    assert methods == ["dual-provider-fusion"]
+
+    # The secondary provider is not registered: dual fusion loses to single.
+    decision, methods = await plan(
+        _config(secondary="qwen3-vl-page"), _staging_snapshot()
+    )
+    assert "dual-provider-fusion" in decision.blocked
+    assert methods == ["single-provider"]
+
+    # The extraction capability is absent: no remote extraction method remains.
+    decision, methods = await plan(
+        _config(), _staging_snapshot_without("document.structure.extract")
+    )
+    assert "document.structure.extract" in " ".join(
+        reason for reasons in decision.blocked.values() for reason in reasons
+    )
+    assert methods == ["human-review"]
+
+    # No snapshot: fail closed, even though one existed before.
+    decision, methods = await plan(
+        _config(), None, error="ToolboxTimeout: catalogue unavailable"
+    )
+    assert decision.catalog_error == "ToolboxTimeout: catalogue unavailable"
+    assert decision.offered == []
+    assert methods == ["human-review"]
 
 
 @pytest.mark.asyncio

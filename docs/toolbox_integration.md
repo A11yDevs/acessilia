@@ -328,6 +328,16 @@ has no failover: a secondary's snapshot would admit methods that execution
 still sends to the primary. When the primary's catalogue cannot be read, the
 gate fails closed as described below.
 
+The gate deliberately reads **only** the primary catalogue. Secondary endpoints
+are independent deployments, not replicas: the SDK checks a secondary's
+catalogue before failing over to it at execution time, but the gate never
+unions the catalogues. With `TOOLBOX_BASE_URLS` whose deployments publish
+different capability/provider sets, a method the secondary could serve is still
+ruled out when the primary does not publish it. This is the conservative
+policy already recorded in `toolbox_gate._catalog_endpoint` (#429); a deployment
+that relies on semantically different secondaries must accept that limitation
+until the policy is reviewed ([#938](https://github.com/A11yDevs/acessilia/issues/938)).
+
 | `TOOLBOX_AVAILABILITY_GATE` | Effect |
 |---|---|
 | `enforce` (default) | The snapshot decides what the problem offers. Methods whose requirements it does not publish are ruled out by the planner, and so is every method with Toolbox requirements when the catalogue cannot be read and the last good snapshot is older than `TOOLBOX_CATALOG_STALE_SECONDS` (fail closed). The gate only logs the decision and records it in `canonical_metadata.pddl_toolbox_availability` |
@@ -344,6 +354,9 @@ plan built under the former `observe` mode keeps `offered: null` in its
 metadata, so its replans keep offering every requirement; delete the plan
 checkpoint to replan under the snapshot. The resume logs the mismatch between
 the checkpoint's mode and the run's effective mode.
+
+To reproduce the production evidence required before enabling `enforce`, follow
+[toolbox_availability_validation.md](toolbox_availability_validation.md).
 
 ### 4.4 Tests
 

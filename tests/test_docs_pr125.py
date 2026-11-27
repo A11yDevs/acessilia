@@ -20,6 +20,7 @@ PAIRS = (
     ("pddl_pipeline.md", "pddl_pipeline.pt-br.md"),
     ("testing.md", "testing.pt-br.md"),
     ("toolbox_integration.md", "toolbox_integration.pt-br.md"),
+    ("toolbox_availability_validation.md", "toolbox_availability_validation.pt-br.md"),
     ("toolbox_capability_matrix.md", "toolbox_capability_matrix.pt-br.md"),
     ("staging_consistency.md", "staging_consistency.pt-br.md"),
 )

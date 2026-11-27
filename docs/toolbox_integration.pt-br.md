@@ -329,6 +329,17 @@ conferem o catálogo de um secundário antes de fazer failover para ele
 admitiria métodos que a execução ainda manda para o primário. Quando o catálogo
 do primário não pode ser lido, o gate falha fechado, como descrito abaixo.
 
+O gate lê **somente** o catálogo do primário, de propósito. Endpoints
+secundários são deploys independentes, não réplicas: o SDK confere o catálogo
+de um secundário antes de fazer failover para ele na execução, mas o gate nunca
+une os catálogos. Com `TOOLBOX_BASE_URLS` cujos deploys publicam conjuntos
+diferentes de capacidade/provider, um método que o secundário poderia servir
+ainda é descartado quando o primário não o publica. Essa é a política
+conservadora já registrada em `toolbox_gate._catalog_endpoint` (#429); um deploy
+que dependa de secundários semanticamente diferentes precisa aceitar essa
+limitação até a política ser revista
+([#938](https://github.com/A11yDevs/acessilia/issues/938)).
+
 | `TOOLBOX_AVAILABILITY_GATE` | Efeito |
 |---|---|
 | `enforce` (padrão) | O snapshot decide o que o problema oferece. Métodos cujos requisitos ele não publica são descartados pelo planejador, e o mesmo vale para todo método com requisitos da Toolbox quando o catálogo não pode ser lido e o último snapshot válido tem mais de `TOOLBOX_CATALOG_STALE_SECONDS` (falha fechada). O gate só registra a decisão no log e em `canonical_metadata.pddl_toolbox_availability` |
@@ -345,6 +356,9 @@ de um plano criado sob o antigo `observe` mantém `offered: null` no metadado,
 então seus replanejamentos continuam oferecendo todo requisito; apague o
 checkpoint de plano para replanejar sob o snapshot. A retomada registra a
 divergência entre o modo do checkpoint e o modo efetivo da execução.
+
+Para reproduzir as evidências de produção exigidas antes de ativar `enforce`,
+siga [toolbox_availability_validation.pt-br.md](toolbox_availability_validation.pt-br.md).
 
 ### 4.4 Tests
 
