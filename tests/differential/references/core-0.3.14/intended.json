@@ -22,19 +22,22 @@
         "method": "vision",
         "text_agreement": 1.0
       },
-      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it"
+      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it",
+      "id": "pic1"
     },
     {
       "kind": "added",
       "path": "/sections/0/blocks/4/metadata/formula_text_layer",
       "expected": "E = mc^2",
-      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it"
+      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it",
+      "id": "pic1"
     },
     {
       "kind": "changed",
       "path": "/sections/0/blocks/4/metadata/surrounding_text/1",
       "expected": "s ( t ) = t 3",
-      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14",
+      "id": "pic1"
     },
     {
       "kind": "added",
@@ -44,19 +47,22 @@
         "method": "vision",
         "text_agreement": 1.0
       },
-      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it"
+      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it",
+      "id": "pic1"
     },
     {
       "kind": "added",
       "path": "/metadata/pages/0/blocks/4/metadata/formula_text_layer",
       "expected": "E = mc^2",
-      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it"
+      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it",
+      "id": "pic1"
     },
     {
       "kind": "changed",
       "path": "/metadata/pages/0/blocks/4/metadata/surrounding_text/1",
       "expected": "s ( t ) = t 3",
-      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14",
+      "id": "pic1"
     }
   ],
   "dual-provider": [
@@ -98,7 +104,8 @@
         "text": "See the cart at $v_0$.",
         "type": "paragraph"
       },
-      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place",
+      "id": "element-rescued-p3-u2"
     },
     {
       "kind": "changed",
@@ -140,7 +147,8 @@
         "text": "See the cart at $v_0$.",
         "type": "paragraph"
       },
-      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place",
+      "id": "element-rescued-p3-u2"
     }
   ],
   "degraded": [
@@ -148,25 +156,29 @@
       "kind": "changed",
       "path": "/sections/0/blocks/1/metadata/surrounding_text/1",
       "expected": "s ( t ) = t 3",
-      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14",
+      "id": "pic1"
     },
     {
       "kind": "changed",
       "path": "/sections/0/blocks/2/metadata/surrounding_text/1",
       "expected": "s ( t ) = t 3",
-      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14",
+      "id": "pic2"
     },
     {
       "kind": "changed",
       "path": "/metadata/pages/0/blocks/1/metadata/surrounding_text/1",
       "expected": "s ( t ) = t 3",
-      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14",
+      "id": "pic1"
     },
     {
       "kind": "changed",
       "path": "/metadata/pages/0/blocks/2/metadata/surrounding_text/1",
       "expected": "s ( t ) = t 3",
-      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14",
+      "id": "pic2"
     }
   ]
 }

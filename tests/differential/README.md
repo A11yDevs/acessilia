@@ -168,23 +168,72 @@ allows**:
 ```
 
 The fields of an entry:
+
 - `kind` is `added`, `removed` or `changed`.
 - `path` is a JSON pointer in which `*` matches any run of characters. Use
-  `*` only where the position, not the field, varies.
+  `*` only where the position, not the field, varies. Matching uses
+  `fnmatchcase`: `*` includes `/`, so `/blocks/*/text` also matches
+  `/blocks/0/children/1/text`. Use restricted patterns or exact paths when
+  depth matters; id binding does not change these wildcard rules.
 - `expected` is required for `added` and `changed`: a later change of the
   same field is not accepted with it.
 - `was` is optional for `removed`, and checks the value that went.
-- Entries under `*` apply to every case.
+- `id` is optional: it additionally requires the nearest enclosing member
+  of a list whose ids are distinct, non-empty strings to have that id.
+  Nested identified members take precedence over outer ones; an `id` in
+  ordinary metadata does not override the containing block's identity.
+  For `changed`, both trees must prove the same member in the same list
+  context. Corresponding identified ancestors must have equal ids; plain
+  arrays remain positional. A list advertising invalid or ambiguous ids
+  blocks the binding, even when the other side is valid or an outer id
+  matches. `added` uses the current tree and `removed` the reference.
+  A missing/different identity leaves the difference
+  unexplained and the declaration unused. An invalid binding (not a
+  non-empty string) is rejected even when there are no differences.
+- Entries under `*` are candidates for every case. An `id` restricts which
+  differences they match; it does not suppress unused-declaration reporting.
+  `explain` returns the entry as unused in a case without a matching change.
+  The corpus allows a common entry to be unused in individual cases, but
+  requires it to explain at least one difference across the cases. Entries
+  under a case name must be used in that case. Prefer a case-specific entry
+  for a change intended only for that case.
 
-An undeclared difference fails, and so does a declared one that no longer
-happens.
+An undeclared difference fails. A case-specific declaration that explains
+nothing in that case fails; a common declaration that explains no case
+also fails.
 
 Lists of objects that all carry a distinct, non-empty string `id` (blocks,
 elements) are aligned by id: an inserted block is one `added`, and the same
 blocks in another order are one `changed` of the list. A difference inside a
-block that moved also names its `reference_path`, for information only: a
-declaration uses the current `path` (the reference's, for `removed`).
-Binding a declaration to an object's id is #895.
+block that moved also names its `reference_path`: the identity check follows
+that historical path to prove correspondence, while declaration patterns
+still use the current `path` (the reference's, for `removed`).
+An id binding (#895) adds a condition; it never replaces the path or value
+checks. For example:
+
+```json
+{"kind": "changed", "path": "/sections/*/blocks/*/text", "id": "block-a",
+ "expected": "Corrected text", "reason": "Intentional correction to block-a"}
+```
+
+This entry cannot explain the same text in another block moved to that
+position. Use a positional wildcard when that object's position can vary:
+the same id at another position still has to match `path`. Ids are scoped
+to their containing list; keep `path` specific enough to distinguish lists
+that reuse ids. Entries without
+`id` retain their positional meaning. A whole-list order change remains one
+`changed` difference; binding to one of that list's members cannot explain
+it, because identity lookup examines enclosing objects, not descendants.
+One declaration may explain several matching differences: a local id is
+neither a global identity nor a cardinality limit.
+
+For scientific evaluation (#619), record the evaluation commit or hashes
+of `compare.py` and the `intended.json` files along with the pipeline commit,
+configuration and harness/dependency identity. The recorded outputs and
+`SOURCE.json` describe execution evidence; the comparison policy describes
+its evaluation. Differential agreement measures preservation relative to
+historical outputs, not absolute document quality or superiority of a
+planning approach; those claims need separate ground-truth evaluation.
 
 ## What the references show
 

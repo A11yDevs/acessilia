@@ -176,24 +176,77 @@ permite**:
 ```
 
 Os campos de uma entrada:
+
 - `kind` é `added`, `removed` ou `changed`.
 - `path` é um JSON pointer em que `*` casa qualquer sequência de caracteres.
-  Use `*` só onde a posição, não o campo, varia.
+  Use `*` só onde a posição, não o campo, varia. O casamento usa
+  `fnmatchcase`: `*` inclui `/`, então `/blocks/*/text` também casa com
+  `/blocks/0/children/1/text`. Use padrões restritos ou caminhos exatos quando
+  a profundidade importar; o vínculo por id não muda essas regras.
 - `expected` é obrigatório para `added` e `changed`: uma mudança posterior do
   mesmo campo não é aceita com ele.
 - `was` é opcional para `removed` e confere o valor que saiu.
-- Entradas sob `*` valem para todo caso.
+- `id` é opcional: exige também que o membro envolvente mais próximo de
+  uma lista com ids string distintos e não vazios tenha esse id. Membros
+  identificados internos têm precedência sobre os externos; um `id` nos
+  metadados comuns não substitui a identidade do bloco que os contém.
+  Em `changed`, ambas as árvores precisam comprovar o mesmo membro no mesmo
+  contexto de lista. Ancestrais identificados correspondentes precisam ter
+  ids iguais; arrays comuns continuam posicionais. Uma lista que apresenta
+  ids inválidos ou ambíguos impede o vínculo, mesmo se o outro lado é válido
+  ou um id externo coincide. `added` usa a árvore atual; `removed`, a referência.
+  Uma identidade ausente ou diferente deixa a diferença sem
+  explicação e a declaração sem uso. Um vínculo inválido (não é string
+  não vazia) é rejeitado mesmo quando não existem diferenças.
+- Entradas sob `*` são candidatas para todo caso. O `id` restringe as
+  diferenças que elas explicam; não suprime o relato de declarações sem uso.
+  `explain` devolve a entrada como não utilizada num caso sem mudança
+  correspondente. O corpus permite que uma entrada comum não seja usada em
+  casos individuais, mas exige que ela explique ao menos uma diferença no
+  conjunto de casos. Entradas sob o nome de um caso precisam ser usadas
+  naquele caso. Prefira uma entrada específica para uma mudança pretendida
+  somente para aquele caso.
 
-Uma diferença não declarada falha, e uma declarada que não acontece mais
-também.
+Uma diferença não declarada falha. Uma declaração específica que nada
+explica naquele caso falha; uma declaração comum que nenhum caso usa
+também falha.
 
 Listas de objetos que trazem todos um `id` string, não vazio e distinto
 (blocos, elementos) são alinhadas pelo id: um bloco inserido é um `added`, e
 os mesmos blocos em outra ordem são um `changed` da lista. Uma diferença
 dentro de um bloco que mudou de lugar também informa o seu
-`reference_path`, só como informação: uma declaração usa o `path` atual (o
-da referência, para `removed`). Vincular uma declaração ao id de um objeto é
-a #895.
+`reference_path`: a verificação de identidade segue esse caminho histórico
+para comprovar correspondência, enquanto os padrões da declaração continuam
+usando o `path` atual (o da referência, para `removed`).
+
+O vínculo por id (#895) acrescenta uma condição; nunca substitui as
+verificações de caminho ou valor. Por exemplo:
+
+```json
+{"kind": "changed", "path": "/sections/*/blocks/*/text", "id": "block-a",
+ "expected": "Corrected text", "reason": "Intentional correction to block-a"}
+```
+
+Essa entrada não explica o mesmo texto em outro bloco que passou a ocupar
+aquela posição. Use curinga de posição quando a posição desse objeto puder
+variar: o mesmo id em outro lugar ainda precisa casar com `path`. Os ids
+têm o escopo da lista que os contém; mantenha `path` específico o bastante
+para distinguir listas que reutilizam ids. Entradas
+sem `id` mantêm o significado posicional. Uma mudança de ordem da lista
+continua sendo uma diferença `changed`; vincular a um dos membros dessa
+lista não a explica, pois a busca de identidade examina objetos envolventes,
+não seus descendentes.
+Uma declaração pode explicar várias diferenças que casem: um id local não
+é identidade global nem limite de cardinalidade.
+
+Na avaliação científica (#619), registre o commit de avaliação ou os hashes
+de `compare.py` e dos arquivos `intended.json`, além do commit do pipeline,
+da configuração e da identidade do harness e das dependências. As saídas
+gravadas e `SOURCE.json` descrevem evidência de execução; a política de
+comparação descreve sua avaliação. Concordância diferencial mede preservação
+em relação a saídas históricas, não qualidade documental absoluta nem
+superioridade de uma abordagem de planejamento; essas alegações exigem
+avaliação separada com ground truth.
 
 ## O que as referências mostram
 

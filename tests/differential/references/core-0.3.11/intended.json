@@ -34,31 +34,36 @@
       "kind": "changed",
       "path": "/metadata/pages/1/blocks/1/metadata/inline_math_detection/marked",
       "expected": 1,
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
       "path": "/metadata/pages/1/blocks/1/metadata/inline_math_detection/unmatched",
       "expected": 0,
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
       "path": "/metadata/pages/1/blocks/1/metadata/table_ast/body/3/cells/1/text",
       "expected": "$s_0\\in\\mathbb{R}$",
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
       "path": "/metadata/pages/1/blocks/1/rows/3/1",
       "expected": "$s_0\\in\\mathbb{R}$",
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
       "path": "/metadata/pages/1/blocks/1/table_ast/body/3/cells/1/text",
       "expected": "$s_0\\in\\mathbb{R}$",
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
@@ -70,7 +75,8 @@
       "kind": "removed",
       "path": "/metadata/pages/2/blocks/1/metadata/mathml",
       "was": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>a = \\frac{v}{t}</mtext></math>",
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "mineru-v2"
     },
     {
       "kind": "changed",
@@ -89,37 +95,43 @@
           "speech": "spoken s_0\\in\\mathbb{R}"
         }
       ],
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
       "path": "/sections/0/blocks/4/metadata/inline_math_detection/marked",
       "expected": 1,
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
       "path": "/sections/0/blocks/4/metadata/inline_math_detection/unmatched",
       "expected": 0,
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
       "path": "/sections/0/blocks/4/metadata/table_ast/body/3/cells/1/text",
       "expected": "$s_0\\in\\mathbb{R}$",
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
       "path": "/sections/0/blocks/4/rows/3/1",
       "expected": "$s_0\\in\\mathbb{R}$",
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
       "path": "/sections/0/blocks/4/table_ast/body/3/cells/1/text",
       "expected": "$s_0\\in\\mathbb{R}$",
-      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step"
+      "reason": "core 0.3.12 (#599, #835): the inline math is marked again after the plan, so the table adopted from the secondary provider gets its marks, and a formula conversion made before them is dropped for the canonical build to redo; M4b (0.3.20) does it as a planned step",
+      "id": "t1"
     },
     {
       "kind": "changed",
@@ -153,7 +165,8 @@
         "text": "See the cart at $v_0$.",
         "type": "paragraph"
       },
-      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place",
+      "id": "element-rescued-p3-u2"
     },
     {
       "kind": "changed",
@@ -195,7 +208,8 @@
         "text": "See the cart at $v_0$.",
         "type": "paragraph"
       },
-      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place",
+      "id": "element-rescued-p3-u2"
     }
   ]
 }
