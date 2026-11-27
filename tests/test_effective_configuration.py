@@ -172,7 +172,7 @@ def test_attempt_and_provenance_are_explicit() -> None:
     }
 
 
-def test_the_record_never_carries_a_credential_or_a_verbatim_prompt() -> None:
+def test_the_record_omits_known_credentials_and_verbatim_prompts() -> None:
     service = _service(
         bot_token="service-secret-bot",
         observability_api_token="service-secret-observability",
