@@ -60,17 +60,33 @@ mudando apenas a formatação, o local do arquivo de lock e a presença de uma
 função `main()`. O ponto de entrada dos console scripts agora importa `main` de
 `frontend.run`, então o runtime tem uma única implementação e um único lock
 (`frontend/bot.lock`). Iniciar um dos entry points com o outro já rodando agora é
-recusado, em vez de usar dois locks separados. O runtime também reconhece o lock
-legado `frontend/cli/bot.lock`: se ele apontar para um processo vivo, o startup é
-recusado; se estiver obsoleto ou malformado, é removido.
+recusado, em vez de usar dois locks separados. O runtime toma um lock exclusivo
+do sistema operacional sobre o arquivo (`fcntl.flock` no POSIX,
+`msvcrt.locking` no Windows) e o mantém por um handle aberto durante toda a vida
+do processo, então duas aquisições concorrentes não podem ambas ter sucesso; o
+PID no arquivo é diagnóstico. O runtime também reconhece o lock legado
+`frontend/cli/bot.lock`: se ele apontar para um processo vivo, o startup é
+recusado; se o dono não puder ser inspecionado, como um processo de outro
+usuário, o lock é mantido e o startup é recusado; se estiver obsoleto ou
+malformado, é removido.
+
+O modo `0600` é best-effort: é aplicado na criação e restringido no POSIX quando
+possível, e não protege o arquivo contra remoção por quem tem permissão de
+escrita no diretório. O lock do SO, não o modo, é o mecanismo de exclusão mútua.
+
+Um runtime antigo anterior a esta mudança não toma lock do SO e ainda remove o
+arquivo ao sair, então um único upgrade in-place ainda pode sobrepor um início
+antigo e um novo; o novo runtime recusa um arquivo que nomeia um PID antigo vivo,
+mas não consegue impedir essa remoção.
 
 O comportamento de startup e lock é fixado por `tests/test_frontend_startup.py`:
 cada interface habilitada, as saídas por token ausente e por nenhuma interface, o
-ciclo do lock (arquivo vivo, obsoleto e malformado) e as sondagens de PID em
-POSIX/Windows. `tests/test_process_setup.py` continua conferindo que o runtime
-configura o processo antes de obter o lock.
+ciclo do lock (arquivo vivo, obsoleto e malformado, e duas aquisições
+concorrentes), o tratamento conservador de um dono não inspecionável e as
+sondagens de PID em POSIX/Windows. `tests/test_process_setup.py` continua
+conferindo que o runtime configura o processo antes de obter o lock.
 
-**Delta medido no commit de código deste PR:** 23 grupos / 55 funções / 672
+**Delta medido no commit de código do #656:** 23 grupos / 55 funções / 672
 linhas → **20 grupos / 49 funções / 499 linhas**. Os grupos `_is_process_running`,
 `acquire_lock` e `startup` desaparecem.
 

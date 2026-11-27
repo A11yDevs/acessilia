@@ -8,14 +8,49 @@ the shared runtime and the delegated entry point (#656, groups 8–10).
 from __future__ import annotations
 
 import asyncio
+import errno
 import os
+import subprocess
 import sys
+import time
+from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import pytest
 
 from frontend import run as runtime
 from frontend.cli import run as console
+
+_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _install_fake_fcntl(monkeypatch) -> None:
+    """Give a Windows host the POSIX branch when a test forces ``linux``."""
+    if hasattr(runtime, "fcntl"):
+        return
+    monkeypatch.setattr(
+        runtime,
+        "fcntl",
+        SimpleNamespace(
+            flock=lambda *args: None,
+            LOCK_EX=0,
+            LOCK_NB=0,
+            LOCK_UN=0,
+        ),
+        raising=False,
+    )
+
+
+def _held_lock_text() -> str:
+    """Read the diagnostic PID through the handle that owns the OS lock.
+
+    On Windows a byte-range lock is mandatory, so a second handle cannot read
+    the held byte; the owning handle can.
+    """
+    handle = runtime._LOCK_STATE.handle
+    assert handle is not None
+    handle.seek(0)
+    return handle.read().decode("utf-8")
 
 
 class RecordingLogger:
@@ -77,7 +112,8 @@ def lock_files(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime, "LOCK_FILE", str(current))
     monkeypatch.setattr(runtime, "LEGACY_LOCK_FILE", str(legacy))
     monkeypatch.setattr(runtime, "logger", RecordingLogger())
-    return SimpleNamespace(current=current, legacy=legacy)
+    yield SimpleNamespace(current=current, legacy=legacy)
+    runtime.release_lock()
 
 
 @pytest.fixture
@@ -254,10 +290,21 @@ def test_main_releases_the_lock_and_exits_on_startup_failure(monkeypatch) -> Non
 
 def test_the_lock_records_the_process_and_is_released(lock_files) -> None:
     runtime.acquire_lock()
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
 
     runtime.release_lock()
-    assert not lock_files.current.exists()
+    # The file stays in place: unlinking it would let a second process lock
+    # the old inode while a third creates and locks a new one (#742).
+    assert lock_files.current.exists()
+    assert lock_files.current.read_text(encoding="utf-8") == ""
+
+
+def test_a_released_lock_can_be_acquired_again(lock_files) -> None:
+    runtime.acquire_lock()
+    runtime.release_lock()
+    runtime.acquire_lock()
+
+    assert _held_lock_text() == str(os.getpid())
 
 
 def test_a_live_lock_is_refused(lock_files, monkeypatch) -> None:
@@ -269,6 +316,56 @@ def test_a_live_lock_is_refused(lock_files, monkeypatch) -> None:
 
     assert raised.value.code == 1
     assert lock_files.current.read_text(encoding="utf-8") == "1234"
+    assert any(
+        "1234" in message and str(lock_files.current) in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+def test_a_live_lock_that_cannot_be_inspected_is_not_removed(
+    lock_files, monkeypatch
+) -> None:
+    """A process owned by another user is unknown, not stale (#742)."""
+    lock_files.current.write_text("1234", encoding="utf-8")
+
+    def denied(pid: int, signal: int) -> None:
+        raise PermissionError("Operation not permitted")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    _install_fake_fcntl(monkeypatch)
+    monkeypatch.setattr(runtime.os, "kill", denied)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert lock_files.current.read_text(encoding="utf-8") == "1234"
+    assert any(
+        "cannot determine" in message.lower()
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+def test_a_legacy_lock_that_cannot_be_inspected_is_not_removed(
+    lock_files, monkeypatch
+) -> None:
+    lock_files.legacy.write_text("1234", encoding="utf-8")
+
+    def denied(pid: int, signal: int) -> None:
+        raise PermissionError("Operation not permitted")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    _install_fake_fcntl(monkeypatch)
+    monkeypatch.setattr(runtime.os, "kill", denied)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert lock_files.legacy.read_text(encoding="utf-8") == "1234"
+    assert not lock_files.current.exists()
 
 
 def test_a_stale_lock_is_replaced(lock_files, monkeypatch) -> None:
@@ -277,7 +374,7 @@ def test_a_stale_lock_is_replaced(lock_files, monkeypatch) -> None:
 
     runtime.acquire_lock()
 
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
 
 
 def test_a_malformed_lock_is_replaced(lock_files) -> None:
@@ -285,7 +382,227 @@ def test_a_malformed_lock_is_replaced(lock_files) -> None:
 
     runtime.acquire_lock()
 
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
+
+
+def test_a_held_lock_without_a_readable_pid_is_reported(
+    lock_files, monkeypatch
+) -> None:
+    lock_files.current.write_text("not a pid", encoding="utf-8")
+    # The OS lock is held but the file has no PID to show (e.g. on Windows
+    # the mandatory byte lock makes the holder's PID unreadable).
+    monkeypatch.setattr(runtime, "_acquire_os_lock", lambda handle: False)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert any(
+        "Another instance holds the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+def test_a_held_lock_whose_pid_cannot_be_read_is_reported(
+    lock_files, monkeypatch
+) -> None:
+    """Windows mandatory byte locks make the holder's PID unreadable."""
+
+    def unreadable(handle):
+        raise PermissionError("The process cannot access the file")
+
+    monkeypatch.setattr(runtime, "_acquire_os_lock", lambda handle: False)
+    monkeypatch.setattr(runtime, "_read_lock_pid", unreadable)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert any(
+        "Another instance holds the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+def test_a_lock_file_that_cannot_be_opened_is_reported(
+    lock_files, monkeypatch
+) -> None:
+    def denied(*args, **kwargs):
+        raise PermissionError("Operation not permitted")
+
+    monkeypatch.setattr(runtime.os, "open", denied)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert any(
+        "Cannot use the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+def test_a_lock_pid_that_cannot_be_written_is_reported(
+    lock_files, monkeypatch
+) -> None:
+    def failed(handle):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(runtime, "_write_lock_pid", failed)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert any(
+        "Cannot use the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+def test_a_lock_pid_that_cannot_be_read_after_acquisition_is_reported(
+    lock_files, monkeypatch
+) -> None:
+    original = runtime._read_lock_pid
+
+    def unreadable(handle):
+        runtime._read_lock_pid = original
+        raise OSError("read failed")
+
+    monkeypatch.setattr(runtime, "_read_lock_pid", unreadable)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert runtime._LOCK_STATE.handle is None
+    assert any(
+        "Cannot use the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+    # The failed acquisition released the handle, so a later attempt succeeds.
+    runtime.acquire_lock()
+    assert _held_lock_text() == str(os.getpid())
+
+
+def test_an_os_lock_error_is_reported_as_unusable(
+    lock_files, monkeypatch
+) -> None:
+    def failed(handle):
+        raise OSError(errno.EIO, "I/O error")
+
+    monkeypatch.setattr(runtime, "_acquire_os_lock", failed)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert runtime._LOCK_STATE.handle is None
+    assert any(
+        "Cannot use the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (BlockingIOError(errno.EAGAIN, "busy"), True),
+        (OSError(errno.EIO, "I/O error"), False),
+    ],
+)
+def test_lock_contention_classification(monkeypatch, error, expected) -> None:
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+
+    assert runtime._is_lock_contention(error) is expected
+
+
+def test_windows_lock_contention_classification(monkeypatch) -> None:
+    monkeypatch.setattr(runtime.sys, "platform", "win32")
+
+    assert runtime._is_lock_contention(OSError(errno.EACCES, "busy"))
+    assert not runtime._is_lock_contention(OSError(errno.EINVAL, "bad"))
+
+
+def test_a_huge_pid_is_unknown(monkeypatch) -> None:
+    def overflow(pid, signal):
+        raise OverflowError("pid out of range")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    monkeypatch.setattr(runtime.os, "kill", overflow)
+
+    with pytest.raises(runtime._ProcessCheckError):
+        runtime._is_process_running(2**40)
+
+
+def test_a_huge_current_lock_pid_is_not_removed(
+    lock_files, monkeypatch
+) -> None:
+    lock_files.current.write_text(str(2**40), encoding="utf-8")
+
+    def overflow(pid, signal):
+        raise OverflowError("pid out of range")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    _install_fake_fcntl(monkeypatch)
+    monkeypatch.setattr(runtime.os, "kill", overflow)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert lock_files.current.read_text(encoding="utf-8") == str(2**40)
+    assert any(
+        "cannot determine" in message.lower()
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+def test_a_huge_legacy_lock_pid_is_not_removed(
+    lock_files, monkeypatch
+) -> None:
+    lock_files.legacy.write_text(str(2**40), encoding="utf-8")
+
+    def overflow(pid, signal):
+        raise OverflowError("pid out of range")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    _install_fake_fcntl(monkeypatch)
+    monkeypatch.setattr(runtime.os, "kill", overflow)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert lock_files.legacy.read_text(encoding="utf-8") == str(2**40)
+    assert not lock_files.current.exists()
+
+
+@pytest.mark.parametrize("pid_text", ["0", "-1"])
+def test_a_non_positive_legacy_pid_is_removed(lock_files, pid_text) -> None:
+    lock_files.legacy.write_text(pid_text, encoding="utf-8")
+
+    runtime.acquire_lock()
+
+    assert not lock_files.legacy.exists()
+    assert _held_lock_text() == str(os.getpid())
+
+
+@pytest.mark.parametrize("raw", ["0", "-1", "not a pid", ""])
+def test_read_lock_pid_returns_none_for_non_positive(raw, tmp_path) -> None:
+    path = tmp_path / "lock"
+    path.write_text(raw, encoding="utf-8")
+
+    with path.open("r+b") as handle:
+        assert runtime._read_lock_pid(handle) is None
 
 
 def test_a_live_legacy_lock_is_refused(lock_files, monkeypatch) -> None:
@@ -307,7 +624,11 @@ def test_a_stale_legacy_lock_is_removed(lock_files, monkeypatch) -> None:
     runtime.acquire_lock()
 
     assert not lock_files.legacy.exists()
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
+    assert any(
+        "Legacy lock file stale" in message
+        for _, message in runtime.logger.calls
+    )
 
 
 def test_a_malformed_legacy_lock_is_removed(lock_files) -> None:
@@ -316,7 +637,44 @@ def test_a_malformed_legacy_lock_is_removed(lock_files) -> None:
     runtime.acquire_lock()
 
     assert not lock_files.legacy.exists()
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
+
+
+def test_a_legacy_lock_that_cannot_be_read_is_reported(lock_files) -> None:
+    lock_files.legacy.mkdir()
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert any(
+        "Cannot use the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+def test_a_legacy_lock_that_cannot_be_removed_is_reported(
+    lock_files, monkeypatch
+) -> None:
+    lock_files.legacy.write_text("1234", encoding="utf-8")
+    monkeypatch.setattr(runtime, "_is_process_running", lambda pid: False)
+
+    def denied(*args, **kwargs):
+        raise PermissionError("Operation not permitted")
+
+    monkeypatch.setattr(runtime.os, "remove", denied)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert lock_files.legacy.read_text(encoding="utf-8") == "1234"
+    assert any(
+        "Cannot use the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
 
 
 def test_posix_pid_probe_treats_a_running_process_as_alive(monkeypatch) -> None:
@@ -332,13 +690,9 @@ def test_posix_pid_probe_treats_a_running_process_as_alive(monkeypatch) -> None:
     assert calls == [(4321, 0)]
 
 
-@pytest.mark.parametrize("error", [ProcessLookupError, PermissionError])
-def test_posix_pid_probe_treats_missing_or_denied_processes_as_stale(
-    monkeypatch,
-    error,
-) -> None:
+def test_posix_pid_probe_treats_a_missing_process_as_stale(monkeypatch) -> None:
     def fail(pid: int, signal: int) -> None:
-        raise error()
+        raise ProcessLookupError()
 
     monkeypatch.setattr(runtime.sys, "platform", "linux")
     monkeypatch.setattr(runtime.os, "kill", fail)
@@ -346,16 +700,37 @@ def test_posix_pid_probe_treats_missing_or_denied_processes_as_stale(
     assert runtime._is_process_running(4321) is False
 
 
+def test_posix_pid_probe_refuses_to_guess_when_permission_is_denied(
+    monkeypatch,
+) -> None:
+    def fail(pid: int, signal: int) -> None:
+        raise PermissionError("Operation not permitted")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    monkeypatch.setattr(runtime.os, "kill", fail)
+
+    with pytest.raises(runtime._ProcessCheckError):
+        runtime._is_process_running(4321)
+
+
 @pytest.mark.parametrize(
     ("stdout", "expected"),
-    [('"python.exe","4321","Console","1","10 K"', True), ("", False)],
+    [
+        ('"python.exe","4321","Console","1","10 K"', True),
+        ('"python.exe","14321","Console","1","10 K"', False),
+        ('"python.exe","43210","Console","1","10 K"', False),
+        ("", False),
+        ("INFO: No tasks are running which match the specified criteria.", False),
+    ],
 )
-def test_windows_pid_probe_reads_tasklist(monkeypatch, stdout, expected) -> None:
+def test_windows_pid_probe_matches_the_exact_csv_pid(
+    monkeypatch, stdout, expected
+) -> None:
     calls = []
 
     def fake_run(args, **kwargs):
         calls.append((args, kwargs))
-        return SimpleNamespace(stdout=stdout)
+        return SimpleNamespace(stdout=stdout, stderr="", returncode=0)
 
     monkeypatch.setattr(runtime.sys, "platform", "win32")
     monkeypatch.setattr(runtime.subprocess, "run", fake_run)
@@ -369,3 +744,208 @@ def test_windows_pid_probe_reads_tasklist(monkeypatch, stdout, expected) -> None
         "/FO",
         "CSV",
     ]
+    assert calls[0][1]["errors"] == "replace"
+
+
+def test_windows_pid_probe_refuses_to_guess_when_tasklist_fails(
+    monkeypatch,
+) -> None:
+    def fake_run(args, **kwargs):
+        return SimpleNamespace(stdout="", stderr="Access denied", returncode=1)
+
+    monkeypatch.setattr(runtime.sys, "platform", "win32")
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+
+    with pytest.raises(runtime._ProcessCheckError):
+        runtime._is_process_running(4321)
+
+
+def test_windows_pid_probe_refuses_to_guess_when_tasklist_cannot_start(
+    monkeypatch,
+) -> None:
+    def fake_run(args, **kwargs):
+        raise OSError("tasklist not found")
+
+    monkeypatch.setattr(runtime.sys, "platform", "win32")
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+
+    with pytest.raises(runtime._ProcessCheckError):
+        runtime._is_process_running(4321)
+
+
+def test_windows_pid_probe_refuses_to_guess_when_tasklist_times_out(
+    monkeypatch,
+) -> None:
+    def fake_run(args, **kwargs):
+        raise subprocess.TimeoutExpired(args, runtime._TASKLIST_TIMEOUT_SECONDS)
+
+    monkeypatch.setattr(runtime.sys, "platform", "win32")
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+
+    with pytest.raises(runtime._ProcessCheckError):
+        runtime._is_process_running(4321)
+
+
+#: A subprocess that holds the lock until the test lets it go.
+_HOLDER_SCRIPT = """
+import os
+import sys
+import time
+from pathlib import Path
+
+import frontend.run as runtime
+
+lock_file, legacy_file, ready_file, go_file = sys.argv[1:5]
+runtime.LOCK_FILE = lock_file
+runtime.LEGACY_LOCK_FILE = legacy_file
+
+
+class SilentLogger:
+    def __getattr__(self, name):
+        return lambda *args, **kwargs: None
+
+
+runtime.logger = SilentLogger()
+runtime.acquire_lock()
+Path(ready_file).write_text(str(os.getpid()), encoding="utf-8")
+try:
+    while not Path(go_file).exists():
+        time.sleep(0.01)
+finally:
+    runtime.release_lock()
+"""
+
+#: A subprocess that must be refused while the holder owns the lock.
+_CONTENDER_SCRIPT = """
+import sys
+
+import frontend.run as runtime
+
+runtime.LOCK_FILE = sys.argv[1]
+runtime.LEGACY_LOCK_FILE = sys.argv[2]
+
+
+class SilentLogger:
+    def __getattr__(self, name):
+        return lambda *args, **kwargs: None
+
+
+runtime.logger = SilentLogger()
+# The OS lock must be the gate, not the holder's live PID: with this stub a
+# broken flock would let the contender acquire and the test would fail.
+runtime._is_process_running = lambda pid: False
+runtime.acquire_lock()
+runtime.release_lock()
+"""
+
+
+def _wait_for_ready(process, ready_file) -> None:
+    """Wait for the holder to publish its PID, failing on an early exit."""
+    deadline = time.monotonic() + 30
+    while not ready_file.exists():
+        if process.poll() is not None:
+            pytest.fail(
+                f"lock holder exited before acquiring (status {process.returncode})"
+            )
+        if time.monotonic() > deadline:
+            pytest.fail("lock holder did not acquire the lock in time")
+        time.sleep(0.02)
+
+
+def test_two_concurrent_acquisitions_cannot_both_succeed(tmp_path) -> None:
+    lock_file = tmp_path / "bot.lock"
+    legacy_file = tmp_path / "cli" / "bot.lock"
+    ready_file = tmp_path / "ready"
+    go_file = tmp_path / "go"
+
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            _HOLDER_SCRIPT,
+            str(lock_file),
+            str(legacy_file),
+            str(ready_file),
+            str(go_file),
+        ],
+        cwd=_ROOT,
+        # The holder must not block on a full pipe; its status is all the test
+        # needs.
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    try:
+        _wait_for_ready(holder, ready_file)
+
+        contender = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                _CONTENDER_SCRIPT,
+                str(lock_file),
+                str(legacy_file),
+            ],
+            cwd=_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        assert contender.returncode == 1, contender.stderr
+    finally:
+        go_file.touch(exist_ok=True)
+        try:
+            holder.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            holder.kill()
+            holder.wait(timeout=30)
+
+    assert holder.returncode == 0
+
+
+def test_an_abruptly_terminated_owner_releases_the_lock(tmp_path) -> None:
+    lock_file = tmp_path / "bot.lock"
+    legacy_file = tmp_path / "cli" / "bot.lock"
+    ready_file = tmp_path / "ready"
+    go_file = tmp_path / "go"
+
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            _HOLDER_SCRIPT,
+            str(lock_file),
+            str(legacy_file),
+            str(ready_file),
+            str(go_file),
+        ],
+        cwd=_ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    try:
+        _wait_for_ready(holder, ready_file)
+        holder.kill()
+        holder.wait(timeout=30)
+
+        contender = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                _CONTENDER_SCRIPT,
+                str(lock_file),
+                str(legacy_file),
+            ],
+            cwd=_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        assert contender.returncode == 0, contender.stderr
+    finally:
+        if holder.poll() is None:
+            holder.kill()
+            holder.wait(timeout=30)

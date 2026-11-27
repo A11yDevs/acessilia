@@ -149,8 +149,12 @@ from acessilia_core.i18n.log_messages import (
     LOG_JOB_COMPLETED,
     LOG_JOB_EXECUTOR_ERROR,
     LOG_LOCK_ACQUIRED,
+    LOG_LOCK_ALREADY_HELD,
     LOG_LOCK_FILE_STALE,
+    LOG_LOCK_LEGACY_FILE_STALE,
+    LOG_LOCK_OWNER_UNKNOWN,
     LOG_LOCK_RELEASED,
+    LOG_LOCK_UNUSABLE,
     LOG_LOGGER_CONFIGURED,
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     LOG_MEDIA_INSPECT_FAILED,
@@ -866,9 +870,13 @@ MESSAGES: tuple[str, ...] = (
     # then en_US) per the project i18n goal for operator-facing output.
     LOG_LOGGER_CONFIGURED,
     LOG_BOT_ALREADY_RUNNING,
+    LOG_LOCK_ALREADY_HELD,
     LOG_LOCK_FILE_STALE,
+    LOG_LOCK_LEGACY_FILE_STALE,
+    LOG_LOCK_OWNER_UNKNOWN,
     LOG_LOCK_ACQUIRED,
     LOG_LOCK_RELEASED,
+    LOG_LOCK_UNUSABLE,
     LOG_API_INTERFACE_ENABLED,
     LOG_TELEGRAM_INTERFACE_ENABLED,
     LOG_TELEGRAM_INTERFACE_NO_TOKEN,
@@ -1882,9 +1890,27 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Server-side runtime log messages (pt-BR mirrors of libs/core/src/acessilia_core/i18n/log_messages.py),
         # resolved at log time through t() so operator logs follow the server locale.
         LOG_LOGGER_CONFIGURED: "Logger configurado - nível: {level}",
-        LOG_BOT_ALREADY_RUNNING: "Outra instância do bot já está em execução (PID={pid})",
+        LOG_BOT_ALREADY_RUNNING: (
+            "Outra instância do bot já está em execução (PID={pid}, lock {path})"
+        ),
+        LOG_LOCK_ALREADY_HELD: "Outra instância mantém o lock de processo ({path})",
+        LOG_LOCK_UNUSABLE: (
+            "Não foi possível usar o lock de processo {path}: {error}. Recusando "
+            "iniciar; pare qualquer instância em execução ou corrija as permissões "
+            "do arquivo"
+        ),
+        LOG_LOCK_OWNER_UNKNOWN: (
+            "Não foi possível determinar se o processo do arquivo de lock {path} "
+            "(PID={pid}) está em execução: {error}. Recusando iniciar; pare todas "
+            "as instâncias que possam usar este lock e remova o arquivo somente "
+            "após confirmar que nenhuma está em execução"
+        ),
         LOG_LOCK_FILE_STALE: (
-            "Arquivo de lock obsoleto (PID {pid} não existe), removendo..."
+            "Arquivo de lock obsoleto (PID {pid} não está em execução); substituindo..."
+        ),
+        LOG_LOCK_LEGACY_FILE_STALE: (
+            "Arquivo de lock legado obsoleto (PID {pid} não está em execução); "
+            "removendo {path}..."
         ),
         LOG_LOCK_ACQUIRED: "Lock adquirido (PID={pid})",
         LOG_LOCK_RELEASED: "Lock liberado",
