@@ -9,7 +9,7 @@ import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, Callable, Coroutine, cast
 
 from acessilia_core.blocking import run_blocking
 from acessilia_core.config import CoreConfig, ToolboxConfig
@@ -422,13 +422,8 @@ class JobExecutor:
                 "Job {}: effective configuration not persisted: {}", task_id, exc
             )
 
-    async def run(self, job: ApiJob) -> None:
-        task_id = job.task_id
-        started_at = time.time()
-        out_dir: Path | None = None
-        result_published = False
-        resumed = state_manager.obter(task_id) is not None
-        preserve_for_resume = False
+    def _status_callback(self, task_id: str) -> Callable[[str], Coroutine[Any, Any, None]]:
+        """The progress callback a run uses, persisting every stage (#407)."""
 
         async def status_callback(msg: str) -> None:
             state_manager.atualizar(task_id, etapa=msg)
@@ -442,6 +437,17 @@ class JobExecutor:
                 await run_blocking(save_status, task_id, status)
             except Exception as exc:  # noqa: BLE001 - progress must not fail the job
                 logger.warning("Job {}: stage not persisted: {}", task_id, exc)
+
+        return status_callback
+
+    async def run(self, job: ApiJob) -> None:
+        task_id = job.task_id
+        started_at = time.time()
+        out_dir: Path | None = None
+        result_published = False
+        resumed = state_manager.obter(task_id) is not None
+        preserve_for_resume = False
+        status_callback = self._status_callback(task_id)
 
         try:
             queued_jobs.pop(task_id, None)
