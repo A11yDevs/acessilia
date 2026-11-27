@@ -15,7 +15,7 @@ from acessilia_core.i18n.log_messages import (
     LOG_WORKER_TASK_STARTING,
 )
 from acessilia_core.logger import logger
-from backend.config.settings import Settings, settings
+from backend.config.settings import MULTI_JOB_GATE_MESSAGE, Settings, settings
 
 
 @dataclass
@@ -30,9 +30,13 @@ class QueueItem:
 
 
 class UnifiedQueue:
-    def __init__(self, max_concurrent: int = 1):
+    def __init__(self, max_concurrent: int = 1, *, allow_multi_job: bool = False):
         if max_concurrent < 1:
             raise ValueError(f"max_concurrent must be positive, got {max_concurrent}")
+        # The factory passes the configured experimental opt-in; direct
+        # construction (tests or future callers) must request it explicitly.
+        if max_concurrent > 1 and not allow_multi_job:
+            raise ValueError(MULTI_JOB_GATE_MESSAGE)
         self._queue: deque[QueueItem] = deque()
         self._active_items: dict[str, QueueItem] = {}
         self._active_tasks: dict[str, asyncio.Task] = {}
@@ -162,9 +166,15 @@ def create_unified_queue(configured: Settings | None = None) -> UnifiedQueue:
 
     Kept as a factory so tests can exercise a custom ``Settings`` without
     reloading the module; the process owner is built from the service settings.
+    Revalidates the multi-job gate because ``Settings`` is mutable after
+    construction (#830).
     """
     source = settings if configured is None else configured
-    return UnifiedQueue(max_concurrent=source.queue_max_concurrent)
+    source.validate_queue_concurrency()
+    return UnifiedQueue(
+        max_concurrent=source.queue_max_concurrent,
+        allow_multi_job=source.queue_multi_job_experimental,
+    )
 
 
 unified_queue = create_unified_queue()

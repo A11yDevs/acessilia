@@ -73,7 +73,8 @@ budget (#828). Sizing the admission capacity does not make multi-job execution
 safe, so `QUEUE_MAX_CONCURRENT` above 1 stays gated behind the explicit
 `QUEUE_MULTI_JOB_EXPERIMENTAL=true` opt-in until #238 W1 supplies per-source
 fairness, a public cancellation API and the memory/failure-isolation decisions
-(#830).
+(#830). The settings validation, the queue factory and the queue constructor
+enforce the same invariant.
 
 A rejection is admission pressure, not provider health. It is retried once
 like a timeout, without consuming an answer attempt; if it persists, the stage

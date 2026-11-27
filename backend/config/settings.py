@@ -20,6 +20,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 #: pipeline's inspection calls and scheduling jitter.
 DEFAULT_MODEL_CALL_MAX_PENDING = 4
 
+#: Operator-facing reason for the multi-job gate. Shared by the settings
+#: validation and the queue constructor so a mutated ``Settings`` cannot start
+#: a multi-job queue without the same explicit opt-in.
+MULTI_JOB_GATE_MESSAGE = (
+    "QUEUE_MAX_CONCURRENT greater than 1 requires "
+    "QUEUE_MULTI_JOB_EXPERIMENTAL=true: multi-job execution stays "
+    "experimental until #238 W1 adds per-source fairness, a public "
+    "cancellation API and the memory/failure-isolation decisions. "
+    "Keep QUEUE_MAX_CONCURRENT=1 in production."
+)
+
 
 @dataclass
 class Settings:
@@ -109,18 +120,16 @@ class Settings:
     )
     # How many jobs the UnifiedQueue may run at once. Production keeps one;
     # raising it is what makes the model-call admission capacity below matter
-    # (#590, #238 W1). Multi-job execution remains experimental until the W1
-    # fairness and cancellation decisions land; the model-call floor is checked
-    # at startup.
+    # (#590). Multi-job execution is experimental and gated: a value above 1 is
+    # refused unless ``queue_multi_job_experimental`` is set, because #238 W1
+    # still owes per-source fairness, a public cancellation API and the
+    # memory/failure-isolation decisions. The opt-in is separate from this size
+    # so changing one sizing value cannot enable multi-job mode. The model-call
+    # floor is checked at startup.
     queue_max_concurrent: int = field(
         default_factory=lambda: int(os.getenv("QUEUE_MAX_CONCURRENT", "1"))
     )
-    # Explicit acknowledgement required to run more than one job at once. The
-    # admission-capacity sizing in #590 is not enough: #238 W1 still owes
-    # per-source fairness, a public cancellation API and the memory/failure
-    # isolation decisions. Keeping the gate separate from
-    # ``QUEUE_MAX_CONCURRENT`` means a deployment cannot enable multi-job mode
-    # by changing one sizing value alone.
+    # Explicit acknowledgement for the gate above (default false).
     queue_multi_job_experimental: bool = field(
         default_factory=lambda: (
             os.getenv("QUEUE_MULTI_JOB_EXPERIMENTAL", "false").strip().lower()
@@ -630,14 +639,7 @@ class Settings:
             raise ValueError(
                 f"QUEUE_MAX_CONCURRENT must be positive, got {self.queue_max_concurrent}"
             )
-        if self.queue_max_concurrent > 1 and not self.queue_multi_job_experimental:
-            raise ValueError(
-                "QUEUE_MAX_CONCURRENT greater than 1 requires "
-                "QUEUE_MULTI_JOB_EXPERIMENTAL=true: multi-job execution stays "
-                "experimental until #238 W1 adds per-source fairness, a public "
-                "cancellation API and the memory/failure-isolation decisions. "
-                "Keep QUEUE_MAX_CONCURRENT=1 in production."
-            )
+        self.validate_queue_concurrency()
         if self.model_call_workers < 1:
             raise ValueError(
                 f"MODEL_CALL_WORKERS must be positive, got {self.model_call_workers}"
@@ -663,6 +665,16 @@ class Settings:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+
+    def validate_queue_concurrency(self) -> None:
+        """Refuse multi-job queue execution without the explicit opt-in.
+
+        Called by ``__post_init__`` and by ``create_unified_queue`` so a
+        ``Settings`` mutated after construction is revalidated before it can
+        start a queue (#830).
+        """
+        if self.queue_max_concurrent > 1 and not self.queue_multi_job_experimental:
+            raise ValueError(MULTI_JOB_GATE_MESSAGE)
 
     def model_call_admission_floor(self, jobs_at_once: int | None = None) -> int:
         """Pending calls needed so ``jobs_at_once`` stages fit without rejection.

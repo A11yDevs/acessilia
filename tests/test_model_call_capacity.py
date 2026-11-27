@@ -3,7 +3,8 @@
 The runner rejects at capacity instead of queueing without bound (ADR-0021).
 The queue's jobs multiply each stage's ``VISION_CONCURRENCY``, so the process
 must reserve enough pending calls or over-capacity calls degrade objects as
-if the provider had failed.
+if the provider had failed. The same file covers the multi-job gate that keeps
+that concurrency experimental until #238 W1 lands (#830).
 """
 
 from __future__ import annotations
@@ -107,10 +108,21 @@ def test_a_false_opt_in_does_not_enable_multi_job(monkeypatch, tmp_path, value):
         Settings()
 
 
-def test_the_experimental_opt_in_allows_multi_job(monkeypatch, tmp_path):
+@pytest.mark.parametrize("value", ["", "maybe", "2"])
+def test_unknown_opt_in_values_fail_closed(monkeypatch, tmp_path, value):
     _isolated_dirs(monkeypatch, tmp_path)
     monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "2")
-    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", "true")
+    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", value)
+
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        Settings()
+
+
+@pytest.mark.parametrize("value", ["true", "1", "yes", "on", "sim", "TRUE", " true "])
+def test_truthy_opt_in_values_enable_multi_job(monkeypatch, tmp_path, value):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "2")
+    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", value)
 
     configured = Settings()
 
@@ -129,13 +141,37 @@ def test_single_job_concurrency_does_not_require_the_opt_in(monkeypatch, tmp_pat
     assert configured.queue_multi_job_experimental is False
 
 
-def test_the_gate_cannot_be_bypassed_with_a_direct_setting():
+def test_rebuilding_settings_revalidates_the_gate():
     with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
         replace(
             settings,
             queue_max_concurrent=2,
             queue_multi_job_experimental=False,
         )
+
+
+def test_the_queue_constructor_requires_the_experimental_opt_in():
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        UnifiedQueue(max_concurrent=2)
+
+    queue = UnifiedQueue(max_concurrent=2, allow_multi_job=True)
+
+    assert queue.max_concurrent == 2
+
+
+def test_the_queue_factory_revalidates_a_mutated_settings():
+    configured = replace(settings, queue_multi_job_experimental=False)
+    configured.queue_max_concurrent = 2
+
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        create_unified_queue(configured)
+
+
+def test_the_queue_factory_accepts_a_mutated_settings_with_the_opt_in():
+    configured = replace(settings, queue_multi_job_experimental=True)
+    configured.queue_max_concurrent = 2
+
+    assert create_unified_queue(configured).max_concurrent == 2
 
 
 def test_a_queue_built_from_settings_uses_its_concurrency():

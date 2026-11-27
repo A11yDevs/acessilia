@@ -60,7 +60,9 @@ once. Running more than one job is gated: the settings refuse a value above 1
 unless `QUEUE_MULTI_JOB_EXPERIMENTAL=true` explicitly accepts that #238 W1 still
 owes per-source fairness, a public cancellation API and the memory/failure
 isolation decisions. Production keeps it at 1; the opt-in is separate from the
-size so changing one sizing value cannot enable multi-job mode.
+size so changing one sizing value cannot enable multi-job mode. The queue
+factory and constructor revalidate the same invariant, so a settings object
+mutated after construction still cannot start a multi-job queue.
 `MODEL_CALL_WORKERS` (default 4) bounds worker reservations across jobs and
 transient loops; `MODEL_CALL_MAX_PENDING` (default 4, or the larger
 `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY − MODEL_CALL_WORKERS` when unset

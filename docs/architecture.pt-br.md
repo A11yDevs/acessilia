@@ -63,7 +63,9 @@ de 1 a menos que `QUEUE_MULTI_JOB_EXPERIMENTAL=true` aceite explicitamente que a
 #238 W1 ainda deve a justiça por origem, a API pública de cancelamento e as
 decisões de isolamento de memória/falhas. A produção o mantém em 1; o opt-in é
 separado do dimensionamento para que mudar um único valor de tamanho não habilite
-o modo multi-job. `MODEL_CALL_WORKERS` (padrão 4) limita as reservas de workers
+o modo multi-job. A fábrica e o construtor da fila revalidam a mesma invariante,
+de modo que um objeto de configuração mutado após a construção ainda não consegue
+iniciar uma fila multi-job. `MODEL_CALL_WORKERS` (padrão 4) limita as reservas de workers
 entre jobs e loops transitórios; `MODEL_CALL_MAX_PENDING` (padrão 4, ou o maior
 valor `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY − MODEL_CALL_WORKERS` quando não
 definido ou -1) limita chamadas adicionais em espera. São configurações do processo,
