@@ -111,7 +111,9 @@ async def test_cancelled_extraction_advances_queue_and_reports_wait(isolated_run
 @pytest.mark.asyncio
 @pytest.mark.parametrize("max_concurrent", [1, 2])
 async def test_repeated_cancellations_cannot_start_unbounded_threads(tmp_path, max_concurrent):
-    queue = UnifiedQueue(max_concurrent=max_concurrent)
+    queue = UnifiedQueue(
+        max_concurrent=max_concurrent, allow_multi_job=max_concurrent > 1
+    )
     count = max_concurrent + 2
     entered = [threading.Event() for _ in range(count)]
     release = [threading.Event() for _ in range(count)]
@@ -152,7 +154,9 @@ async def test_repeated_cancellations_cannot_start_unbounded_threads(tmp_path, m
 @pytest.mark.asyncio
 @pytest.mark.parametrize("max_concurrent", [1, 2])
 async def test_normal_jobs_keep_the_configured_concurrency(tmp_path, max_concurrent):
-    queue = UnifiedQueue(max_concurrent=max_concurrent)
+    queue = UnifiedQueue(
+        max_concurrent=max_concurrent, allow_multi_job=max_concurrent > 1
+    )
     started = [asyncio.Event() for _ in range(max_concurrent + 1)]
     release = asyncio.Event()
 

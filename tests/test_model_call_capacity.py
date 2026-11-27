@@ -3,7 +3,8 @@
 The runner rejects at capacity instead of queueing without bound (ADR-0021).
 The queue's jobs multiply each stage's ``VISION_CONCURRENCY``, so the process
 must reserve enough pending calls or over-capacity calls degrade objects as
-if the provider had failed.
+if the provider had failed. The same file covers the multi-job gate that keeps
+that concurrency experimental until #238 W1 lands (#830).
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ def _isolated_dirs(monkeypatch, tmp_path) -> None:
 def test_the_default_pending_capacity_covers_the_configured_jobs(monkeypatch, tmp_path):
     _isolated_dirs(monkeypatch, tmp_path)
     monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "5")
+    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", "true")
     monkeypatch.setenv("VISION_CONCURRENCY", "2")
     monkeypatch.setenv("MODEL_CALL_WORKERS", "4")
     monkeypatch.delenv("MODEL_CALL_MAX_PENDING", raising=False)
@@ -56,6 +58,7 @@ def test_an_explicit_pending_capacity_too_small_for_the_jobs_is_reported():
     configured = replace(
         settings,
         queue_max_concurrent=5,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=4,
         model_call_max_pending=4,
@@ -73,6 +76,7 @@ def test_capacity_that_covers_the_jobs_is_not_reported():
     configured = replace(
         settings,
         queue_max_concurrent=5,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=4,
         model_call_max_pending=6,
@@ -85,8 +89,119 @@ def test_the_queue_uses_the_configured_concurrency():
     assert unified_queue.max_concurrent == settings.queue_max_concurrent
 
 
+def test_multi_job_concurrency_requires_the_experimental_opt_in(monkeypatch, tmp_path):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "2")
+    monkeypatch.delenv("QUEUE_MULTI_JOB_EXPERIMENTAL", raising=False)
+
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        Settings()
+
+
+@pytest.mark.parametrize("value", ["false", "0", "no", "off"])
+def test_a_false_opt_in_does_not_enable_multi_job(monkeypatch, tmp_path, value):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "2")
+    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", value)
+
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        Settings()
+
+
+@pytest.mark.parametrize("value", ["", "maybe", "2"])
+def test_unknown_opt_in_values_fail_closed(monkeypatch, tmp_path, value):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "2")
+    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", value)
+
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        Settings()
+
+
+@pytest.mark.parametrize("value", ["true", "1", "yes", "on", "sim", "TRUE", " true "])
+def test_truthy_opt_in_values_enable_multi_job(monkeypatch, tmp_path, value):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "2")
+    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", value)
+
+    configured = Settings()
+
+    assert configured.queue_max_concurrent == 2
+    assert configured.queue_multi_job_experimental is True
+
+
+def test_single_job_concurrency_does_not_require_the_opt_in(monkeypatch, tmp_path):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "1")
+    monkeypatch.delenv("QUEUE_MULTI_JOB_EXPERIMENTAL", raising=False)
+
+    configured = Settings()
+
+    assert configured.queue_max_concurrent == 1
+    assert configured.queue_multi_job_experimental is False
+
+
+def test_rebuilding_settings_revalidates_the_gate():
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        replace(
+            settings,
+            queue_max_concurrent=2,
+            queue_multi_job_experimental=False,
+        )
+
+
+def test_the_queue_constructor_requires_the_experimental_opt_in():
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        UnifiedQueue(max_concurrent=2)
+
+    queue = UnifiedQueue(max_concurrent=2, allow_multi_job=True)
+
+    assert queue.max_concurrent == 2
+
+
+@pytest.mark.parametrize("allow_multi_job", [False, None, 1, "false", "true"])
+def test_a_truthy_programmatic_authorization_is_not_enough(allow_multi_job):
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        UnifiedQueue(max_concurrent=2, allow_multi_job=allow_multi_job)
+
+
+@pytest.mark.parametrize("opt_in", [False, None, 1, "false", "true"])
+def test_a_truthy_programmatic_settings_authorization_is_not_enough(opt_in):
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        replace(
+            settings,
+            queue_max_concurrent=2,
+            queue_multi_job_experimental=opt_in,
+        )
+
+
+def test_the_queue_factory_revalidates_a_mutated_settings():
+    configured = replace(
+        settings,
+        queue_max_concurrent=1,
+        queue_multi_job_experimental=False,
+    )
+    configured.queue_max_concurrent = 2
+
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        create_unified_queue(configured)
+
+
+def test_the_queue_factory_accepts_a_mutated_settings_with_the_opt_in():
+    configured = replace(
+        settings,
+        queue_max_concurrent=1,
+        queue_multi_job_experimental=True,
+    )
+    configured.queue_max_concurrent = 2
+
+    assert create_unified_queue(configured).max_concurrent == 2
+
+
 def test_a_queue_built_from_settings_uses_its_concurrency():
-    configured = replace(settings, queue_max_concurrent=3)
+    configured = replace(
+        settings, queue_max_concurrent=3, queue_multi_job_experimental=True
+    )
 
     assert create_unified_queue(configured).max_concurrent == 3
 
@@ -114,6 +229,7 @@ def test_the_minus_one_sentinel_derives_the_pending_floor():
     configured = replace(
         settings,
         queue_max_concurrent=5,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=4,
         model_call_max_pending=-1,
@@ -135,6 +251,7 @@ async def test_queue_jobs_use_the_derived_model_call_capacity(tmp_path):
     configured = replace(
         settings,
         queue_max_concurrent=2,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=1,
     )
@@ -211,6 +328,7 @@ def test_the_startup_warning_is_logged_once_per_process(monkeypatch):
     configured = replace(
         settings,
         queue_max_concurrent=5,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=4,
         model_call_max_pending=4,
@@ -223,15 +341,64 @@ def test_the_startup_warning_is_logged_once_per_process(monkeypatch):
     assert "MODEL_CALL_MAX_PENDING" in warned[0]
 
 
-def test_setup_process_runs_the_capacity_check(monkeypatch):
+def test_the_multi_job_startup_warning_is_logged_once_per_process(monkeypatch):
+    from acessilia_core import logger as core_logger
+    from backend.config import process_setup
+
+    warned: list[str] = []
+    monkeypatch.setattr(process_setup, "_LOGGED_CONFIGURATION_WARNINGS", set())
+    monkeypatch.setattr(core_logger, "logger", SimpleNamespace(warning=warned.append))
+    configured = replace(
+        settings,
+        queue_max_concurrent=2,
+        queue_multi_job_experimental=True,
+    )
+
+    process_setup.warn_multi_job_experimental(configured)
+    process_setup.warn_multi_job_experimental(
+        replace(configured, queue_max_concurrent=3)
+    )
+
+    assert len(warned) == 1
+    assert "QUEUE_MAX_CONCURRENT=2" in warned[0]
+    assert "#238 W1" in warned[0]
+
+
+def test_the_multi_job_startup_warning_is_silent_for_one_job(monkeypatch):
+    from acessilia_core import logger as core_logger
+    from backend.config import process_setup
+
+    warned: list[str] = []
+    monkeypatch.setattr(process_setup, "_LOGGED_CONFIGURATION_WARNINGS", set())
+    monkeypatch.setattr(core_logger, "logger", SimpleNamespace(warning=warned.append))
+    configured = replace(
+        settings,
+        queue_max_concurrent=1,
+        queue_multi_job_experimental=False,
+    )
+
+    process_setup.warn_multi_job_experimental(configured)
+
+    assert warned == []
+
+
+def test_setup_process_runs_the_capacity_and_multi_job_checks(monkeypatch):
     from acessilia_core import i18n, logger as core_logger
     from backend.config import process_setup
 
     checked: list[tuple[object, int | None]] = []
+    multi_job: list[tuple[object, int | None]] = []
     monkeypatch.setattr(
         process_setup,
         "warn_model_call_capacity",
         lambda configured, *, jobs_at_once=None: checked.append((configured, jobs_at_once)),
+    )
+    monkeypatch.setattr(
+        process_setup,
+        "warn_multi_job_experimental",
+        lambda configured, *, jobs_at_once=None: multi_job.append(
+            (configured, jobs_at_once)
+        ),
     )
     monkeypatch.setattr(process_setup, "warn_deprecated_configuration", lambda *a, **k: None)
     monkeypatch.setattr(core_logger, "setup_logger", lambda **_kwargs: None)
@@ -241,3 +408,4 @@ def test_setup_process_runs_the_capacity_check(monkeypatch):
     process_setup.setup_process(settings, environ={}, jobs_at_once=3)
 
     assert checked == [(settings, 3)]
+    assert multi_job == [(settings, 3)]
