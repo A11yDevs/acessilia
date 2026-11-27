@@ -47,6 +47,8 @@ Defined in [backend/api/app.py](../backend/api/app.py), with routes in [backend/
 
 `OPERATIONS_API_TOKEN` is a write-capable password set in `.env` for privileged operations; leaving it empty disables the routes. Invalid or missing credentials return 401. The Telegram bot calls the cache route only for the operators listed in `TELEGRAM_ADMIN_IDS` (see [telegram.md](telegram.md#23-commands)).
 
+The job-configuration route returns the latest persisted attempt, not a history. `attempt` identifies it (`id`, `captured_at`, `resumed`); `provenance.result_origin` is `unknown` when the result may have come from the cache or a checkpoint. The record is minimised for audit: URL userinfo, query strings and fragments are removed, and a custom prompt is stored as a SHA-256 fingerprint and character count. `secrets_omitted` and `not_recorded` list, respectively, the credentials left out and the settings outside the run with their reasons. Availability follows the job record's retention; the response is sent with `Cache-Control: no-store`.
+
 Observations:
 
 - **Errors are always JSON** (`{"detail": "..."}`): `400` validation, `404` not found, `429` rate limit, `500` internal error. There is a global per-IP limit in addition to the per-route ones.

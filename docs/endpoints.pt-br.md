@@ -47,6 +47,8 @@ Definida em [backend/api/app.py](../backend/api/app.py), com as rotas em [backen
 
 `OPERATIONS_API_TOKEN` é uma senha com permissão de escrita definida no `.env` para operações privilegiadas; vazio, as rotas ficam desabilitadas. Credenciais inválidas ou ausentes retornam 401. O bot do Telegram chama a rota de cache apenas para os operadores listados em `TELEGRAM_ADMIN_IDS` (veja [telegram.pt-br.md](telegram.pt-br.md#23-comandos)).
 
+A rota de configuração do job devolve a última tentativa persistida, não um histórico. `attempt` identifica a tentativa (`id`, `captured_at`, `resumed`); `provenance.result_origin` é `unknown` quando o resultado pode ter vindo do cache ou de um checkpoint. O registro é minimizado para auditoria: userinfo, query e fragmento das URLs são removidos, e um prompt personalizado é gravado como fingerprint SHA-256 e contagem de caracteres. `secrets_omitted` e `not_recorded` listam, respectivamente, as credenciais deixadas de fora e as configurações fora do run com seus motivos. A disponibilidade acompanha a retenção do registro do job; a resposta vai com `Cache-Control: no-store`.
+
 Observações:
 
 - **Erros sempre em JSON** (`{"detail": "..."}`): `400` validação, `404` não encontrado, `429` rate limit, `500` erro interno. Há um limite global por IP além dos por rota.
