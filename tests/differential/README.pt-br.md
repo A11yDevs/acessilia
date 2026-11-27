@@ -221,6 +221,14 @@ Essas verificações se aplicam a caminhos concretos, não aos padrões de
 declaração casados por `fnmatchcase`. A validação de escapes de til inválidos
 está registrada na [#920](https://github.com/A11yDevs/acessilia/issues/920).
 
+A detecção de diferenças e `expected`/`was` usam a mesma regra recursiva de
+igualdade JSON. Booleanos diferem de números: `true` não é `1`, e `false`
+não é `0`, inclusive dentro de objetos e arrays. Números são comparados pelo
+valor exato, então `1` e `1.0` (também `0` e `-0.0`) são equivalentes; não há
+arredondamento, tolerância ou coerção de strings. A ordem das chaves de um
+objeto não importa; a ordem dos arrays importa. O alinhamento por identidade
+e a detecção de reordenação de listas continuam aplicáveis.
+
 Uma diferença não declarada falha. Uma declaração específica que nada
 explica naquele caso falha; uma declaração comum que nenhum caso usa
 também falha.

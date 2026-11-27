@@ -55,7 +55,18 @@ def differences(
             else:
                 found.extend(differences(reference[index], current[index], child, reference_child))
         return found
-    return [] if reference == current else [_item("changed", path, reference_path)]
+    return [] if _json_equal(reference, current) else [_item("changed", path, reference_path)]
+
+
+def _json_equal(left: Any, right: Any) -> bool:
+    """JSON equality: booleans differ from numbers, which compare exactly (#919)."""
+    if isinstance(left, bool) != isinstance(right, bool):
+        return False
+    if isinstance(left, dict) and isinstance(right, dict):
+        return left.keys() == right.keys() and all(_json_equal(left[key], right[key]) for key in left)
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(_json_equal(a, b) for a, b in zip(left, right))
+    return left == right
 
 
 def _item(kind: str, path: str, reference_path: str) -> dict[str, str]:
@@ -129,12 +140,12 @@ def _explains(entry: dict[str, Any], item: dict[str, str], reference: Any, curre
     if entry["kind"] == "removed":
         document = reference
         pointer = item.get("reference_path", item["path"])
-        value_matches = "was" not in entry or resolve(document, pointer) == entry["was"]
+        value_matches = "was" not in entry or _json_equal(resolve(document, pointer), entry["was"])
     else:
         document, pointer = current, item["path"]
         if "expected" not in entry:
             raise ValueError(f"an {entry['kind']} difference must name its expected value: {entry}")
-        value_matches = resolve(document, pointer) == entry["expected"]
+        value_matches = _json_equal(resolve(document, pointer), entry["expected"])
     if not value_matches or "id" not in entry:
         return value_matches
     if item["kind"] == "changed":

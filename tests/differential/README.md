@@ -211,6 +211,13 @@ These checks apply to concrete paths, not the declaration patterns matched
 by `fnmatchcase`. Validation of malformed tilde escapes is tracked in
 [#920](https://github.com/A11yDevs/acessilia/issues/920).
 
+Difference detection and `expected`/`was` use the same recursive JSON
+equality rule. Booleans differ from numbers: `true` is not `1`, and `false`
+is not `0`, including inside objects and arrays. Numbers compare by exact
+value, so `1` and `1.0` (also `0` and `-0.0`) are equivalent; there is no
+rounding, tolerance or string coercion. Object key order does not matter;
+array order does. Identity alignment and list-order detection still apply.
+
 An undeclared difference fails. A case-specific declaration that explains
 nothing in that case fails; a common declaration that explains no case
 also fails.
