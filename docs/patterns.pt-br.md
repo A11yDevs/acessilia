@@ -38,7 +38,8 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 
 ### 7. Execução em Instância Única e Travinha de Processo
 - Implementação: [frontend/run.py](../frontend/run.py)
-- Benefício: impede colisões de processos na máquina do host.
+- O lock é um lock exclusivo do sistema operacional (`fcntl.flock` no POSIX, `msvcrt.locking` no Windows) sobre `frontend/bot.lock`, mantido durante toda a vida do processo; o PID gravado no arquivo é diagnóstico e também identifica um lock deixado por um runtime anterior.
+- Benefício: impede colisões de processos na máquina do host, e duas inicializações concorrentes não podem ambas adquirir o lock.
 
 ### 8. Planejamento Determinístico com PDDL
 - Implementação: [libs/core/src/acessilia_core/manifest/](../libs/core/src/acessilia_core/manifest/), [libs/core/src/acessilia_core/planning/](../libs/core/src/acessilia_core/planning/), [libs/core/src/acessilia_core/execution/](../libs/core/src/acessilia_core/execution/), coordenados por [libs/core/src/acessilia_core/pipeline/orchestrator.py](../libs/core/src/acessilia_core/pipeline/orchestrator.py). É o único motor ativo; o manifesto é extraído pela Toolbox.

@@ -38,7 +38,8 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 
 ### 7. Single-Instance Execution & Process Lock
 - Implementation: [frontend/run.py](../frontend/run.py)
-- Benefit: prevents process collisions on the host machine.
+- The lock is an exclusive OS lock (`fcntl.flock` on POSIX, `msvcrt.locking` on Windows) on `frontend/bot.lock`, held for the process lifetime; the PID written to the file is diagnostic and also identifies a lock left by an older runtime.
+- Benefit: prevents process collisions on the host machine, and two concurrent starts cannot both acquire the lock.
 
 ### 8. Deterministic Planning with PDDL
 - Implementation: [libs/core/src/acessilia_core/manifest/](../libs/core/src/acessilia_core/manifest/), [libs/core/src/acessilia_core/planning/](../libs/core/src/acessilia_core/planning/), [libs/core/src/acessilia_core/execution/](../libs/core/src/acessilia_core/execution/), coordinated by [libs/core/src/acessilia_core/pipeline/orchestrator.py](../libs/core/src/acessilia_core/pipeline/orchestrator.py). This is the only active engine; the manifest is extracted through the Toolbox.

@@ -12,11 +12,25 @@ stable English identifiers across every supported locale.
 LOG_LOGGER_CONFIGURED: str = "Logger configured - level: {level}"
 #: Critical message logged when the startup lock file names a live PID already running the bot.
 LOG_BOT_ALREADY_RUNNING: str = "Another instance of the bot is already running (PID={pid})"
-#: Warning logged when a stale lock file whose PID no longer exists is detected and removed.
-LOG_LOCK_FILE_STALE: str = "Lock file stale (PID {pid} does not exist), removing..."
+#: Critical message logged when another process holds the startup lock but its PID is not readable.
+LOG_LOCK_ALREADY_HELD: str = "Another instance holds the process lock ({path})"
+#: Critical message logged when the lock file cannot be inspected, written or removed; {path} is the lock file and {error} the OS error.
+LOG_LOCK_UNUSABLE: str = (
+    "Cannot use the process lock {path}: {error}. Refusing to start; stop any "
+    "running instance or fix the file permissions"
+)
+#: Critical message logged when the lock names a PID whose liveness cannot be checked, such as a process owned by another user.
+LOG_LOCK_OWNER_UNKNOWN: str = (
+    "Cannot determine whether the process in the lock file {path} (PID={pid}) is "
+    "running: {error}. Refusing to start; stop it or remove the file manually"
+)
+#: Warning logged when a stale lock file whose PID is no longer running is detected and replaced.
+LOG_LOCK_FILE_STALE: str = (
+    "Lock file stale (PID {pid} is not running); replacing it..."
+)
 #: Info logged once the startup lock file is written with the current process PID.
 LOG_LOCK_ACQUIRED: str = "Lock acquired (PID={pid})"
-#: Info logged when the startup lock file is removed during graceful shutdown.
+#: Info logged when the startup lock is released and its diagnostic PID cleared during graceful shutdown.
 LOG_LOCK_RELEASED: str = "Lock released"
 #: Info logged when the API interface is enabled at startup; {port} is the bound listen port.
 LOG_API_INTERFACE_ENABLED: str = "API interface enabled (http://localhost:{port})"

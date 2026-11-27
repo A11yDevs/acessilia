@@ -60,12 +60,19 @@ location and the presence of a `main()` function. The console-script entry point
 now imports `main` from `frontend.run`, so the runtime has one implementation and
 one lock (`frontend/bot.lock`). Starting either entry point while the other is
 already running is now refused, instead of using two separate lock files. The
-runtime also recognizes the legacy `frontend/cli/bot.lock`: if it names a live
-process, startup is refused; if it is stale or malformed, it is removed.
+runtime takes an exclusive OS lock on the file (`fcntl.flock` on POSIX,
+`msvcrt.locking` on Windows) and holds it through an open handle for the
+process lifetime, so two concurrent acquisitions cannot both succeed; the PID in
+the file is diagnostic. The runtime also recognizes the legacy
+`frontend/cli/bot.lock`: if it names a live process, startup is refused; if its
+owner cannot be inspected, such as a process owned by another user, the lock is
+kept and startup is refused; if it is stale or malformed, it is removed.
 
 The startup and lock behaviour is pinned by `tests/test_frontend_startup.py`:
 every enabled interface, the missing-token and empty-interface exits, the lock
-lifecycle (live, stale and malformed files), and the POSIX/Windows PID probes.
+lifecycle (live, stale and malformed files, and two concurrent acquisitions),
+the conservative handling of an uninspectable owner, and the POSIX/Windows PID
+probes.
 `tests/test_process_setup.py` keeps checking that the runtime sets up the process
 before it takes the lock.
 

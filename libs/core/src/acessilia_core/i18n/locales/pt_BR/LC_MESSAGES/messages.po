@@ -1359,8 +1359,22 @@ msgid "Another instance of the bot is already running (PID={pid})"
 msgstr "Outra instância do bot já está em execução (PID={pid})"
 
 #, python-brace-format
-msgid "Lock file stale (PID {pid} does not exist), removing..."
-msgstr "Arquivo de lock obsoleto (PID {pid} não existe), removendo..."
+msgid "Another instance holds the process lock ({path})"
+msgstr "Outra instância mantém o lock de processo ({path})"
+
+#, python-brace-format
+msgid "Lock file stale (PID {pid} is not running); replacing it..."
+msgstr "Arquivo de lock obsoleto (PID {pid} não está em execução); substituindo..."
+
+#, python-brace-format
+msgid ""
+"Cannot determine whether the process in the lock file {path} (PID={pid}) "
+"is running: {error}. Refusing to start; stop it or remove the file "
+"manually"
+msgstr ""
+"Não foi possível determinar se o processo do arquivo de lock {path} "
+"(PID={pid}) está em execução: {error}. Recusando iniciar; pare-o ou "
+"remova o arquivo manualmente"
 
 #, python-brace-format
 msgid "Lock acquired (PID={pid})"
@@ -1368,6 +1382,15 @@ msgstr "Lock adquirido (PID={pid})"
 
 msgid "Lock released"
 msgstr "Lock liberado"
+
+#, python-brace-format
+msgid ""
+"Cannot use the process lock {path}: {error}. Refusing to start; stop any "
+"running instance or fix the file permissions"
+msgstr ""
+"Não foi possível usar o lock de processo {path}: {error}. Recusando "
+"iniciar; pare qualquer instância em execução ou corrija as permissões do "
+"arquivo"
 
 #, python-brace-format
 msgid "API interface enabled (http://localhost:{port})"
