@@ -233,7 +233,7 @@ async def process_file(
                 email=email,
             )
         except sqlite3.Error as error:
-            logger.warning("Telegram state store unavailable: %s", error)
+            logger.warning("Telegram state store unavailable: {}", error)
 
         await tracker(t(MSG_TASK_ENQUEUED).format(task_id=task_id))
         if position > 1:
@@ -245,7 +245,7 @@ async def process_file(
             try:
                 get_state_store().remove_task(state_key, task_id)
             except sqlite3.Error as error:
-                logger.warning("Telegram state store unavailable: %s", error)
+                logger.warning("Telegram state store unavailable: {}", error)
     except Exception:
         logger.exception(t(LOG_TELEGRAM_FILE_PROCESSING_ERROR))
         await tracker.finish(success=False)
@@ -415,7 +415,7 @@ async def _resume_task(bot, task: TrackedTask) -> None:
             try:
                 get_state_store().remove_task(task.state_key, task.task_id)
             except sqlite3.Error as error:
-                logger.warning("Telegram state store unavailable: %s", error)
+                logger.warning("Telegram state store unavailable: {}", error)
     except Exception:
         logger.exception(t(LOG_TELEGRAM_FILE_PROCESSING_ERROR))
 
@@ -430,7 +430,7 @@ async def resume_tracked_tasks(bot) -> None:
     try:
         tasks = get_state_store().load_tasks()
     except sqlite3.Error as error:
-        logger.warning("Telegram state store unavailable: %s", error)
+        logger.warning("Telegram state store unavailable: {}", error)
         return
     for task in tasks:
         user_context.user_task_ids[task.state_key] = task.task_id
