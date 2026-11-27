@@ -59,6 +59,7 @@ OPERATIONAL_SETTINGS: tuple[str, ...] = (
     "model_call_workers",
     "pdf_ua_audit_max_rules",
     "queue_max_concurrent",
+    "queue_multi_job_experimental",
     "request_timeout",
     "toolbox_cancel_timeout_seconds",
 )
