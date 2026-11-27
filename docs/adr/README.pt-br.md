@@ -47,6 +47,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0029](0029-symbolic-core-every-step-planned.pt-br.md) | O core planeja e coordena: todo passo semântico do workflow é planejado | Proposta |
 | [0030](0030-providers-compete-per-capability.pt-br.md) | Providers competem por capacidade; as suítes de estrutura ficam estruturais | Proposta |
 | [0031](0031-job-goals-and-plan-selection.pt-br.md) | Metas do job sobrevivem à seleção de um plano | Aceita |
+| [0032](0032-toolbox-runtime-library-placement.pt-br.md) | Operações da Toolbox usam bibliotecas locais em famílias de implantação | Aceita |
 
 ## Processo
 
