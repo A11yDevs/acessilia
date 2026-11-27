@@ -213,6 +213,14 @@ Os campos de uma entrada:
   naquele caso. Prefira uma entrada específica para uma mudança pretendida
   somente para aquele caso.
 
+Caminhos concretos consumidos por `resolve` são vazios ou começam com `/`.
+Índices de listas devem ser `0` ou dígitos decimais ASCII sem zeros iniciais;
+sinais, espaços, underscores e dígitos não ASCII são rejeitados. Um prefixo
+ou índice inválido ou um valor ausente gera `KeyError` com o ponteiro original.
+Essas verificações se aplicam a caminhos concretos, não aos padrões de
+declaração casados por `fnmatchcase`. A validação de escapes de til inválidos
+está registrada na [#920](https://github.com/A11yDevs/acessilia/issues/920).
+
 Uma diferença não declarada falha. Uma declaração específica que nada
 explica naquele caso falha; uma declaração comum que nenhum caso usa
 também falha.

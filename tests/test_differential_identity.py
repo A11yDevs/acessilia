@@ -164,8 +164,9 @@ def test_a_whole_document_change_has_no_enclosing_member_identity(reference, cur
     assert explain(reference, current, [bound]) == (found, [bound])
     wrong_value = {**declaration, "expected": "wrong value"}
     assert explain(reference, current, [wrong_value]) == (found, [wrong_value])
-    legacy_marker = {**bound, "path": "/"}
-    assert explain(reference, current, [legacy_marker]) == (found, [legacy_marker])
+    for entry in (declaration, bound):
+        legacy_marker = {**entry, "path": "/"}
+        assert explain(reference, current, [legacy_marker]) == (found, [legacy_marker])
 
 
 @pytest.mark.parametrize("document", [[{"id": "a"}], [], {"": "empty key"}, None, "text", 1])
@@ -186,6 +187,51 @@ def test_an_invalid_or_missing_list_index_is_a_missing_pointer(pointer):
     with pytest.raises(KeyError) as error:
         resolve([{"id": "a"}], pointer)
     assert error.value.args == (pointer,)
+
+
+@pytest.mark.parametrize("segment", ["01", "00", "+1", "-0", " 1", "1 ", "1_0", "\u0661"])
+def test_a_noncanonical_list_index_is_rejected_even_when_its_integer_value_exists(segment):
+    document = list(range(11))
+    for tree, pointer in ((document, f"/{segment}"), ({"items": document}, f"/items/{segment}")):
+        with pytest.raises(KeyError) as error:
+            resolve(tree, pointer)
+        assert error.value.args == (pointer,)
+    # The same characters are valid object keys, not list indices.
+    assert resolve({segment: "value"}, f"/{segment}") == "value"
+
+
+@pytest.mark.parametrize("index", [0, 1, 10])
+def test_canonical_list_indices_resolve_at_the_root_and_inside_objects(index):
+    document = list(range(11))
+    assert resolve(document, f"/{index}") == index
+    assert resolve({"items": document}, f"/items/{index}") == index
+
+
+@pytest.mark.parametrize("pointer", ["invalid", "invalid/text", "0", "#", "#/text"])
+def test_a_nonempty_pointer_must_start_with_a_slash(pointer):
+    with pytest.raises(KeyError) as error:
+        resolve({"text": "example"}, pointer)
+    assert error.value.args == (pointer,)
+
+
+@pytest.mark.parametrize("reference,current", [
+    ({}, [{"id": "a"}]),
+    ({"": 0}, {"": 1}),
+    ({"a/b": {"~note": 0, "~1": 0}}, {"a/b": {"~note": 1, "~1": 1}}),
+    ({"items": [1, 2, 3]}, {"items": [9]}),
+    ({"items": [9]}, {"items": [1, 2, 3]}),
+    ([{"id": "a", "text": "old"}, {"id": "gone"}], [{"id": "new"}, {"id": "a", "text": "new"}]),
+    ({"groups": [{"id": "g", "items": [{"id": "a", "text": "old", "removed": 0}]}]},
+     {"groups": [{"id": "new"}, {"id": "g", "items": [{"id": "new"}, {"id": "a", "text": "new"}]}]}),
+])
+def test_every_generated_difference_path_resolves_on_its_corresponding_side(reference, current):
+    found = differences(reference, current)
+    assert found
+    for item in found:
+        document = reference if item["kind"] == "removed" else current
+        resolve(document, item["path"])
+        if item["kind"] != "added":
+            resolve(reference, item.get("reference_path", item["path"]))
 
 
 def test_a_root_order_change_can_be_reported_alongside_a_bound_member_change():

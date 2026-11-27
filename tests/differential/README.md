@@ -203,6 +203,14 @@ The fields of an entry:
   under a case name must be used in that case. Prefer a case-specific entry
   for a change intended only for that case.
 
+Concrete paths consumed by `resolve` are either empty or start with `/`.
+List indices must be `0` or ASCII decimal digits without leading zeroes;
+signs, whitespace, underscores and non-ASCII digits are rejected. An invalid
+prefix/index or a missing value raises `KeyError` with the original pointer.
+These checks apply to concrete paths, not the declaration patterns matched
+by `fnmatchcase`. Validation of malformed tilde escapes is tracked in
+[#920](https://github.com/A11yDevs/acessilia/issues/920).
+
 An undeclared difference fails. A case-specific declaration that explains
 nothing in that case fails; a common declaration that explains no case
 also fails.

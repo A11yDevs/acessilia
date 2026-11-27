@@ -7,6 +7,7 @@ outputs are compared does not change what a reference recorded.
 from __future__ import annotations
 
 from fnmatch import fnmatchcase
+from re import fullmatch
 from typing import Any
 
 from tests.differential.runner import escape
@@ -176,25 +177,32 @@ def _enclosing_id(document: Any, pointer: str) -> str | None:
 
     Inspect ancestors, not descendants: changing a list's order cannot be
     attributed to an arbitrary member of that list. Reuse ``resolve`` so
-    escaped property names follow the same JSON-pointer rules as values.
+    escaped property names and list indices follow the same rules as values.
+    The caller supplies a valid, resolvable difference path.
     """
     parts = pointer.split("/")
     for size in range(len(parts) - 1, 0, -1):
         parent = resolve(document, "/".join(parts[:size]))
         if isinstance(parent, list) and _identified(parent):
-            return parent[int(parts[size])]["id"]
+            return resolve(parent, f"/{parts[size]}")["id"]
     return None
 
 
 def resolve(document: Any, pointer: str) -> Any:
     """The value at ``pointer``; ``""`` names the document itself.
 
-    ``"/"`` names an empty property key. A missing value raises ``KeyError``.
+    ``"/"`` names an empty property key. Nonempty pointers start with ``/``;
+    list indices are ``0`` or ASCII decimals without leading zeroes.
+    An invalid prefix/index or a missing value raises ``KeyError(pointer)``.
     """
+    if pointer and not pointer.startswith("/"):
+        raise KeyError(pointer)
     value = document
     for segment in pointer.split("/")[1:]:
         segment = segment.replace("~1", "/").replace("~0", "~")
         if isinstance(value, list):
+            if not fullmatch(r"0|[1-9][0-9]*", segment):
+                raise KeyError(pointer)
             try:
                 index = int(segment)
             except ValueError:
