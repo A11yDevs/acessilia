@@ -41,10 +41,11 @@ Defined in [backend/api/app.py](../backend/api/app.py), with routes in [backend/
 | GET | `/api/v1/logs` | Lists the application log files still retained. Requires `Authorization: Bearer <OBSERVABILITY_API_TOKEN>`. | JSON `{files: [{name, size_bytes}]}`. | 30/min |
 | GET | `/api/v1/logs/{filename}` | Downloads a complete log file, including older `.zip` archives. Requires the same token. | File download; `404` if absent. | 30/min |
 | POST | `/api/v1/cache/clear` | Removes the published processing-cache entries. Requires `Authorization: Bearer <OPERATIONS_API_TOKEN>`. | JSON `{removed}`. | 10/min |
+| GET | `/api/v1/operations/jobs/{task_id}/configuration` | The effective configuration the job's run used, grouped into `processing`, `operational` and `environment`, with `secrets_omitted` naming the credentials left out. Requires `Authorization: Bearer <OPERATIONS_API_TOKEN>`. | JSON record; `404` if the job or its record is missing. | 60/min |
 
 `OBSERVABILITY_API_TOKEN` is a read-only password set in `.env` for history, statistics and logs; leaving it empty disables them. Send it in the header, for example: `curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/v1/logs`. Use HTTPS or a private network to protect the token and log contents. The log routes serve only `bot_*` files in `LOGS_DIR`, within the logger's configured retention period (30 days). Analysis tools can download the files without depending on a particular observability stack. Uvicorn access logs remain available through `docker compose logs`.
 
-`OPERATIONS_API_TOKEN` is a write-capable password set in `.env` for privileged operations; leaving it empty disables the route. Invalid or missing credentials return 401. The Telegram bot calls this route only for the operators listed in `TELEGRAM_ADMIN_IDS` (see [telegram.md](telegram.md#23-commands)).
+`OPERATIONS_API_TOKEN` is a write-capable password set in `.env` for privileged operations; leaving it empty disables the routes. Invalid or missing credentials return 401. The Telegram bot calls the cache route only for the operators listed in `TELEGRAM_ADMIN_IDS` (see [telegram.md](telegram.md#23-commands)).
 
 Observations:
 
