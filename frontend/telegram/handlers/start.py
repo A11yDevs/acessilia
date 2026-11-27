@@ -328,7 +328,7 @@ async def cmd_cancel(message: Message) -> None:
     try:
         get_state_store().remove_task(state_key, task_id)
     except sqlite3.Error as error:
-        logger.warning("Telegram state store unavailable: %s", error)
+        logger.warning("Telegram state store unavailable: {}", error)
     cancelled_id = result.get('task_id', task_id)
     await message.answer(t(MSG_TASK_CANCEL_DONE).format(task_id=cancelled_id))
 
