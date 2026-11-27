@@ -32,8 +32,9 @@ ran for every formula of the obligation, not that each one now has LaTeX: a
 formula left without keeps its text and its reason
 (``formula_recognition_failure``), and its own obligations validate it. The
 message reports what happened to each formula. The method fails when the
-step raises, and when none of its targets is in the manifest any more
-(``MSG_MATH_NO_FORMULA``).
+step raises, when the local model-call runner rejected a target
+(``failure_kind="admission_rejected"``, #828), and when none of its targets
+is in the manifest any more (``MSG_MATH_NO_FORMULA``).
 
 **Inside the step the strategy stays fixed:** ``math.recognize`` first, the
 vision model as the fallback, each reading gated by the text layer. The plan

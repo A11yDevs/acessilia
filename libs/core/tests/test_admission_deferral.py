@@ -10,6 +10,7 @@ a timeout and a semantically insufficient result stay ordinary failures.
 
 from __future__ import annotations
 
+import pytest
 from pddl_support import (
     build_element,
     build_manifest,
@@ -149,3 +150,33 @@ def test_the_replan_retries_a_deferred_action_within_its_budget(monkeypatch, tmp
     _run(orchestrator, manifest, tmp_path, monkeypatch)
 
     assert calls == ["o-1", "o-1"]
+
+
+@pytest.mark.parametrize(("max_replans", "executions"), [(0, 1), (1, 2)])
+def test_a_permanent_rejection_is_bounded_by_the_failure_budget(
+    monkeypatch, tmp_path, max_replans: int, executions: int
+) -> None:
+    """The discovery budget must not extend the admission recovery budget."""
+    calls: list[str] = []
+    manifest = _manifest()
+    orchestrator = build_orchestrator(max_replans=max_replans)
+
+    def always_deferred(_manifest: ProcessingManifest, obligation_id: str) -> MethodResult:
+        calls.append(obligation_id)
+        return _deferring(_manifest, obligation_id)
+
+    orchestrator.executor.registry.register("vision-description", always_deferred)
+
+    with pytest.raises(RuntimeError):
+        _run(orchestrator, manifest, tmp_path, monkeypatch)
+
+    assert len(calls) == executions
+
+
+def test_a_successful_result_cannot_carry_a_failure_kind() -> None:
+    with pytest.raises(ValueError):
+        MethodResult(
+            success=True,
+            validated=True,
+            failure_kind="admission_rejected",
+        )

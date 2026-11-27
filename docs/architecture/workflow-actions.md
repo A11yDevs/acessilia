@@ -553,9 +553,12 @@ document step leaves any target `admission_rejected`, its `MethodResult` is
 the step as `failed` with the same typed kind, leaves the obligation pending
 and records no method attempt, so the replan keeps the method available and
 runs the step again for the objects still pending, within `max_replans`.
-Provider unavailability, a timeout and an insufficient answer stay ordinary
-method failures: they are recorded as tried and the replan may use another
-method. `ExecutionStepResult.failure_kind` exposes the distinction in the
+A deferred action spends the failure recovery budget, not the discovery one;
+when that budget is spent the open obligation follows the delivery policy (a
+critical one fails the job), and a rerun can retry it. Provider
+unavailability, a timeout and an insufficient answer stay ordinary method
+failures: they are recorded as tried and the replan may use another method.
+`ExecutionStepResult.failure_kind` exposes the distinction in the
 execution report; the PDDL domain and the Core–Toolbox contracts do not
 change. A closed runner is lifecycle, not capacity pressure, and stays an
 execution failure.

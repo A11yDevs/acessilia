@@ -23,7 +23,9 @@ table that could not be read keeps its reason (``table_read_failure``:
 ``linearize-table`` obligation validates it. Failing the whole obligation for
 one table would block the tables that are usable. The message reports what
 happened to each table, so the execution report never reads as if every table
-were enriched. The method fails only when a step raises.
+were enriched. The method fails when a step raises, or when the local
+model-call runner rejected a target (``failure_kind="admission_rejected"``,
+#828).
 """
 
 from __future__ import annotations

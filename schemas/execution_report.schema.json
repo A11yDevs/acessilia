@@ -101,19 +101,19 @@
       "type": "object"
     }
   },
-  "$id": "urn:a11y-devs:schema:execution-report:1.0.0",
+  "$id": "urn:a11y-devs:schema:execution-report:1.1.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Report of the execution of a nominal plan over one manifest, with per-step method results and collected artifacts",
   "properties": {
     "$schema": {
-      "default": "urn:a11y-devs:schema:execution-report:1.0.0",
+      "default": "urn:a11y-devs:schema:execution-report:1.1.0",
       "title": "$Schema",
       "type": "string"
     },
     "schema_version": {
-      "const": "1.0.0",
-      "default": "1.0.0",
+      "const": "1.1.0",
+      "default": "1.1.0",
       "title": "Schema Version",
       "type": "string"
     },

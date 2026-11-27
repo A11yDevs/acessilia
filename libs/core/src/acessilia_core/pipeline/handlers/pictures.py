@@ -31,8 +31,10 @@ reason (``vision_failure_reason``: ``model_failed``, ``admission_rejected``,
 ``crop_unavailable``, …), and its ``describe-image`` obligation validates it.
 Failing the whole obligation for one picture would block the pictures that
 are described. The message reports what happened to each picture. The method
-fails when the step raises, and when none of its targets is in the manifest
-any more (``MSG_VISION_NO_PICTURE``), as ``table-enrichment`` does.
+fails when the step raises, when the local model-call runner rejected a
+target (``failure_kind="admission_rejected"``, #828), and when none of its
+targets is in the manifest any more (``MSG_VISION_NO_PICTURE``), as
+``table-enrichment`` does.
 """
 
 from __future__ import annotations

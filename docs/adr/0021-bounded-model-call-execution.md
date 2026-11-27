@@ -88,8 +88,11 @@ Inside a plan, the document enrichment methods carry it as
 `MethodResult.failure_kind="admission_rejected"`; the executor reports it in
 `ExecutionStepResult.failure_kind`, keeps the obligation pending without
 recording the method as tried, and the replanner retries the same action within
-`max_replans` (#828). Provider unavailability, timeouts and insufficient
-answers remain ordinary method failures with their own recovery policy.
+`max_replans` (#828). A deferred action spends the failure recovery budget, not
+the discovery one; when that budget is spent the open obligation follows the
+delivery policy (a critical one fails the job), and a rerun can retry it.
+Provider unavailability, timeouts and insufficient answers remain ordinary
+method failures with their own recovery policy.
 A closed runner raises the `ModelCallClosed` subtype instead: it is lifecycle,
 not capacity pressure, so the agents do not retry it and the stages abort
 rather than record a recoverable degradation. A closed runner also wakes

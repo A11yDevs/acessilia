@@ -1004,6 +1004,11 @@ msgstr ""
 msgid "The method result contains duplicate artifact identifiers"
 msgstr "O resultado do método contém identificadores de artefatos duplicados"
 
+msgid "A method result with a failure kind must not be marked as successful"
+msgstr ""
+"Um resultado de método com tipo de falha não pode ser marcado como bem-"
+"sucedido"
+
 msgid "✅ Conversion complete!"
 msgstr "✅ Conversão concluída!"
 

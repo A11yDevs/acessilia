@@ -574,9 +574,12 @@ consultado. Quando um passo de documento deixa qualquer alvo
 `failure_kind="admission_rejected"`. O executor registra o passo como `failed`
 com o mesmo tipo, deixa a obrigação pendente e não registra tentativa do
 método, então o replanejamento mantém o método disponível e roda o passo de
-novo para os objetos ainda pendentes, dentro de `max_replans`. Indisponibilidade
-do provider, timeout e resposta insuficiente continuam falhas comuns de método:
-elas são registradas como tentadas e o replanejamento pode usar outro método.
+novo para os objetos ainda pendentes, dentro de `max_replans`. Uma ação adiada
+gasta o orçamento de recuperação de falhas, não o de discovery; esgotado esse
+orçamento, a obrigação aberta segue a política de entrega (uma crítica falha o
+job), e uma nova execução pode retentá-la. Indisponibilidade do provider,
+timeout e resposta insuficiente continuam falhas comuns de método: elas são
+registradas como tentadas e o replanejamento pode usar outro método.
 `ExecutionStepResult.failure_kind` expõe a distinção no relatório de execução; o
 domínio PDDL e os contratos Core–Toolbox não mudam. Um runner fechado é ciclo de
 vida, não pressão de capacidade, e continua sendo uma falha de execução.

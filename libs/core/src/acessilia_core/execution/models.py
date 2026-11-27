@@ -8,13 +8,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from acessilia_core.execution.messages import (  # noqa: E402
     MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
+    MSG_METHOD_RESULT_FAILURE_KIND_REQUIRES_FAILURE,
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
 )
 from acessilia_core.i18n import t  # noqa: E402
 from acessilia_core.manifest.models import Artifact  # noqa: E402
 
-EXECUTION_SCHEMA_VERSION: Literal["1.0.0"] = "1.0.0"
-EXECUTION_SCHEMA_ID = "urn:a11y-devs:schema:execution-report:1.0.0"
+EXECUTION_SCHEMA_VERSION: Literal["1.1.0"] = "1.1.0"
+EXECUTION_SCHEMA_ID = "urn:a11y-devs:schema:execution-report:1.1.0"
 
 ReportMode = Literal["live", "dry-run"]
 ReportStatus = Literal[
@@ -50,6 +51,8 @@ class MethodResult(StrictModel):
     def success_requires_validation(self) -> "MethodResult":
         if self.success and not self.validated:
             raise ValueError(t(MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION))
+        if self.success and self.failure_kind is not None:
+            raise ValueError(t(MSG_METHOD_RESULT_FAILURE_KIND_REQUIRES_FAILURE))
         artifact_ids = [artifact.id for artifact in self.artifacts]
         if len(artifact_ids) != len(set(artifact_ids)):
             raise ValueError(t(MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS))
@@ -73,7 +76,7 @@ class ExecutionStepResult(StrictModel):
 
 class ExecutionReport(StrictModel):
     schema_ref: str = Field(default=EXECUTION_SCHEMA_ID, alias="$schema")
-    schema_version: Literal["1.0.0"] = EXECUTION_SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = EXECUTION_SCHEMA_VERSION
     execution_id: str = Field(min_length=1)
     plan_id: str = Field(min_length=1)
     manifest_id: str = Field(min_length=1)

@@ -11,7 +11,7 @@ operacional, não saúde do provider nem resultado semântico, e o planejador
 agora distingue os casos.
 - `MethodResult.failure_kind` e `ExecutionStepResult.failure_kind` carregam
   `admission_rejected` como valor tipado. O schema do relatório de execução
-  ganha o campo opcional, compatível com relatórios que não o usam.
+  agora é `1.1.0`, com o campo opcional; relatórios sem ele continuam válidos.
 - Os métodos de imagens, tabelas, classificação de regiões de fórmula e
   reconhecimento de fórmulas retornam um resultado de falha com esse tipo
   quando algum alvo foi rejeitado por admissão, em vez de declarar o passo
@@ -19,10 +19,14 @@ agora distingue os casos.
 - O executor registra o passo como `failed` com o tipo, deixa a obrigação
   `pending`, não registra tentativa do método e pede replanejamento. O mesmo
   método continua disponível, então o replanejamento o repete para os objetos
-  ainda pendentes dentro de `max_replans`. Um runner fechado continua sendo
-  falha de execução; indisponibilidade do provider, timeout e resposta
-  insuficiente mantêm a política de registrar o método como tentado e usar as
-  alternativas.
+  ainda pendentes dentro de `max_replans`. Uma ação adiada gasta o orçamento de
+  recuperação de falhas, não o de discovery; esgotado esse orçamento, a
+  obrigação aberta segue a política de entrega (uma crítica falha o job). Um
+  runner fechado continua sendo falha de execução; indisponibilidade do
+  provider, timeout e resposta insuficiente mantêm a política de registrar o
+  método como tentado e usar as alternativas.
+- Um método que adiciona obrigações antes de uma rejeição de admissão ainda as
+  seleciona, então o replanejamento não perde o trabalho descoberto (#594).
 - A inspeção de região e de página retorna o tipo em vez de uma falha genérica
   quando o runner local rejeita a chamada.
 - O domínio PDDL e os contratos Core–Toolbox não mudam.

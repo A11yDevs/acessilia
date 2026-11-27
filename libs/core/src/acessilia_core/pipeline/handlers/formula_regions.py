@@ -26,8 +26,9 @@ the changed steps and replans (M0).
 ran for every formula of the obligation. A formula the model gave no answer
 for stays ``unclassified`` with its reason and takes the formula path, whose
 recognition fallback can still reclassify it. The method fails when the step
-raises, and when none of its targets is in the manifest any more
-(``MSG_MATH_NO_FORMULA``).
+raises, when the local model-call runner rejected a target
+(``failure_kind="admission_rejected"``, #828), and when none of its targets
+is in the manifest any more (``MSG_MATH_NO_FORMULA``).
 """
 
 from __future__ import annotations

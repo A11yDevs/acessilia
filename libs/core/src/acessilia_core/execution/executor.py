@@ -669,26 +669,17 @@ class ExecutorAgent:
         known = {item.id for item in state.manifest.obligations}
         try:
             result = handler(state.manifest, obligation.id)
-        except ModelCallClosed as exc:
-            # Shutdown is lifecycle, not capacity: it stays an execution
-            # failure instead of a retryable deferral (#590 review).
-            self._record_obligation_attempt(
-                obligation=obligation,
-                method=method,
-                started_at=attempt_started,
-                completed_at=datetime.now(timezone.utc),
-                status="failed",
-                message=f"{type(exc).__name__}: {exc}",
-                artifact_ids=[],
-            )
-            self._mark_obligation_failed(obligation, state)
-            raise RuntimeError(f"{type(exc).__name__}: {exc}") from exc
-        except ModelCallRejected as exc:
-            # The model call never reached the provider: local admission
-            # pressure is retryable and must not consume the method (#828).
-            obligation.status = "pending"
-            raise _DeferredStep(f"{type(exc).__name__}: {exc}") from exc
         except Exception as exc:
+            if isinstance(exc, ModelCallRejected) and not isinstance(exc, ModelCallClosed):
+                # The model call never reached the provider: local admission
+                # pressure is retryable and must not consume the method (#828).
+                # The handler may still have added obligations before the
+                # rejection, so they must be selected for the replan (#594).
+                self._select_discovered(state, known)
+                obligation.status = "pending"
+                raise _DeferredStep(f"{type(exc).__name__}: {exc}") from exc
+            # A closed runner is lifecycle, not capacity: it stays an
+            # execution failure instead of a retryable deferral (#590 review).
             self._record_obligation_attempt(
                 obligation=obligation,
                 method=method,
@@ -706,7 +697,10 @@ class ExecutorAgent:
         self._append_new_artifacts(state.manifest, result.artifacts)
         if result.failure_kind == "admission_rejected":
             # No attempt is recorded: the planner must keep the method
-            # available and retry this action on the next plan (#828).
+            # available and retry this action on the next plan (#828). Any
+            # obligation the handler added before the rejection is selected
+            # now, as it would be on a successful result (#594).
+            self._select_discovered(state, known)
             obligation.status = "pending"
             raise _DeferredStep(result.message or t(EXE_RESULT_REJECTED))
         self._record_obligation_attempt(

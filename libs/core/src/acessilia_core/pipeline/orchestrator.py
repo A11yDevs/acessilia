@@ -61,6 +61,8 @@ from acessilia_core.pipeline.obligations import (
     _reopen,
     _unsatisfied_selected_obligations,
     _unsatisfied_summary,
+    admission_deferred_obligation_ids,
+    failure_budget_spent,
     planning_signature,
     replan_roots,
 )
@@ -711,21 +713,16 @@ class PddlAccessibilityOrchestrator:
         and the plan it produced come from the checkpoint, so a restart after a
         replan neither repeats one nor exceeds the budget.
         """
-        # A `replan-required` report means the executor recorded `(tried ?o ?m)`
-        # for a method that failed and left the obligation pending. Without this
-        # loop the status was terminal in production: the pipeline returned a plan
-        # it already knew was wrong, and `complete-job` never ran, so no document
-        # was produced.
+        # A `replan-required` report means the executor left work for a replan;
+        # without this loop the status was terminal and no document was made.
+        # Admission deferrals spend the failure budget, never discovery (#828).
+        deferred_ids: set[str] = set()
         while self._replan_needed(execution_report, manifest):
-            # A replan after a failed step recovers from it and counts toward
-            # ``max_replans``. One after a run where nothing failed follows
-            # obligations the run changed (found, removed, replaced: #594,
-            # #832): it has its own bound, and stops when the planning state
-            # (`planning_signature`: targets, dependencies, statuses and tried
-            # methods, not only ids) is the one the previous discovery replan
-            # started from, so it cannot repeat a problem. The signature is
-            # saved with the plan, so a resume keeps the guard.
+            # A failure replan counts toward ``max_replans``; a discovery replan
+            # follows changed obligations with its own bound, stopped by the
+            # planning-signature guard saved with the plan (#594, #832).
             failure = any(step.status == "failed" for step in execution_report.steps)
+            deferred_ids.update(admission_deferred_obligation_ids(execution_report.steps))
             # Reconciled first, so the guard and the roots see the same state.
             # A table the run added is enriched before its own obligations.
             reconcile_document_steps(manifest, replan=True)
@@ -746,7 +743,10 @@ class PddlAccessibilityOrchestrator:
             ]
             if any(_blocks_delivery(obligation, manifest) for obligation in exhausted):
                 break
-            roots = replan_roots(manifest, failure_budget_spent=kind == "discovery" and replans >= self.max_replans)
+            spent = failure_budget_spent(kind, replans, self.max_replans)
+            roots = replan_roots(
+                manifest, failure_budget_spent=spent, excluded=deferred_ids
+            )
             if not roots:
                 break
             _reopen(manifest)  # only now, with the replan allowed (M4b)

@@ -990,6 +990,9 @@ msgstr ""
 msgid "The method result contains duplicate artifact identifiers"
 msgstr "The method result contains duplicate artifact identifiers"
 
+msgid "A method result with a failure kind must not be marked as successful"
+msgstr "A method result with a failure kind must not be marked as successful"
+
 msgid "✅ Conversion complete!"
 msgstr "✅ Conversion complete!"
 

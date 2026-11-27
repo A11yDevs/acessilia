@@ -336,6 +336,33 @@ def test_an_admission_rejection_defers_the_method(monkeypatch) -> None:
     assert updated.elements[-1].metadata["vision_failure_reason"] == "admission_rejected"
 
 
+def test_a_formula_found_before_an_admission_rejection_stays_selected(monkeypatch) -> None:
+    """A mixed outcome keeps the work the step discovered (#594, #828)."""
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, *, image_bytes, **_kwargs):
+            if image_bytes.decode() == "p-1":
+                return _formula("x")
+            raise ModelCallRejected("model-call execution capacity is full")
+
+    monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
+    monkeypatch.setattr(
+        picture_stage, "_extract_picture_bytes",
+        lambda source, element, fallback, *rest, **_kwargs: (element.id.encode(), fallback or 1),
+    )
+    manifest = _pictures_manifest("p-1", "p-2")
+
+    updated, report = _in_executor(manifest)
+
+    discovered = _by_id(updated, "obligation-verbalize-formula-p-1")
+    assert discovered.selected is True
+    assert discovered.status == "candidate"
+    assert _step(report, "obligation-describe-images").failure_kind == "admission_rejected"
+
+
 def test_the_method_without_pictures_fails_instead_of_raising() -> None:
     manifest = _pictures_manifest("p-1")
     enrichment = reconcile_document_step(manifest, PICTURE_DESCRIPTION)

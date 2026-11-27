@@ -88,8 +88,11 @@ execução a retente. Dentro de um plano, os métodos de enriquecimento de
 documento a carregam como `MethodResult.failure_kind="admission_rejected"`; o
 executor a reporta em `ExecutionStepResult.failure_kind`, mantém a obrigação
 pendente sem registrar o método como tentado, e o replanejador repete a mesma
-ação dentro de `max_replans` (#828). Indisponibilidade do provider, timeout e
-resposta insuficiente continuam falhas comuns, com sua própria política. Um
+ação dentro de `max_replans` (#828). Uma ação adiada gasta o orçamento de
+recuperação de falhas, não o de discovery; esgotado esse orçamento, a obrigação
+aberta segue a política de entrega (uma crítica falha o job), e uma nova
+execução pode retentá-la. Indisponibilidade do provider, timeout e resposta
+insuficiente continuam falhas comuns, com sua própria política. Um
 runner fechado gera o subtipo `ModelCallClosed`: é
 ciclo de vida, não pressão de capacidade, então os agentes não o retentam e as
 etapas abortam em vez de registrar uma degradação recuperável. O fechamento
