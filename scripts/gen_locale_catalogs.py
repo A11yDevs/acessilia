@@ -1901,8 +1901,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         LOG_LOCK_OWNER_UNKNOWN: (
             "Não foi possível determinar se o processo do arquivo de lock {path} "
-            "(PID={pid}) está em execução: {error}. Recusando iniciar; pare-o ou "
-            "remova o arquivo manualmente"
+            "(PID={pid}) está em execução: {error}. Recusando iniciar; pare todas "
+            "as instâncias que possam usar este lock e remova o arquivo somente "
+            "após confirmar que nenhuma está em execução"
         ),
         LOG_LOCK_FILE_STALE: (
             "Arquivo de lock obsoleto (PID {pid} não está em execução); substituindo..."

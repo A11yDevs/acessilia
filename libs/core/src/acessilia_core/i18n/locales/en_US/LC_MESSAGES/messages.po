@@ -1357,12 +1357,12 @@ msgstr "Legacy lock file stale (PID {pid} is not running); removing {path}..."
 #, python-brace-format
 msgid ""
 "Cannot determine whether the process in the lock file {path} (PID={pid}) "
-"is running: {error}. Refusing to start; stop it or remove the file "
-"manually"
+"is running: {error}. Refusing to start; stop every instance that may use "
+"this lock, and remove the file only after confirming none is running"
 msgstr ""
 "Cannot determine whether the process in the lock file {path} (PID={pid}) "
-"is running: {error}. Refusing to start; stop it or remove the file "
-"manually"
+"is running: {error}. Refusing to start; stop every instance that may use "
+"this lock, and remove the file only after confirming none is running"
 
 #, python-brace-format
 msgid "Lock acquired (PID={pid})"

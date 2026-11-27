@@ -24,7 +24,8 @@ LOG_LOCK_UNUSABLE: str = (
 #: Critical message logged when the lock names a PID whose liveness cannot be checked, such as a process owned by another user.
 LOG_LOCK_OWNER_UNKNOWN: str = (
     "Cannot determine whether the process in the lock file {path} (PID={pid}) is "
-    "running: {error}. Refusing to start; stop it or remove the file manually"
+    "running: {error}. Refusing to start; stop every instance that may use this "
+    "lock, and remove the file only after confirming none is running"
 )
 #: Warning logged when a stale lock file whose PID is no longer running is detected and replaced.
 LOG_LOCK_FILE_STALE: str = (

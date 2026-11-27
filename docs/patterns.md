@@ -39,6 +39,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ### 7. Single-Instance Execution & Process Lock
 - Implementation: [frontend/run.py](../frontend/run.py)
 - The lock is an exclusive OS lock (`fcntl.flock` on POSIX, `msvcrt.locking` on Windows) on `frontend/bot.lock`, held for the process lifetime; the PID written to the file is diagnostic and also identifies a lock left by an older runtime.
+- The `0600` mode is applied when the file is created and, on POSIX, tightened when possible. It is best-effort: it does not protect the file from removal by anyone with write permission on the directory. Mutual exclusion is the OS lock, not the mode.
 - Benefit: prevents process collisions on the host machine, and two concurrent starts cannot both acquire the lock.
 
 ### 8. Deterministic Planning with PDDL

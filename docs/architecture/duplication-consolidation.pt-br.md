@@ -70,6 +70,10 @@ recusado; se o dono não puder ser inspecionado, como um processo de outro
 usuário, o lock é mantido e o startup é recusado; se estiver obsoleto ou
 malformado, é removido.
 
+O modo `0600` é best-effort: é aplicado na criação e restringido no POSIX quando
+possível, e não protege o arquivo contra remoção por quem tem permissão de
+escrita no diretório. O lock do SO, não o modo, é o mecanismo de exclusão mútua.
+
 Um runtime antigo anterior a esta mudança não toma lock do SO e ainda remove o
 arquivo ao sair, então um único upgrade in-place ainda pode sobrepor um início
 antigo e um novo; o novo runtime recusa um arquivo que nomeia um PID antigo vivo,

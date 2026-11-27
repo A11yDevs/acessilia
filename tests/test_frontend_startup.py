@@ -8,6 +8,7 @@ the shared runtime and the delegated entry point (#656, groups 8–10).
 from __future__ import annotations
 
 import asyncio
+import errno
 import os
 import subprocess
 import sys
@@ -36,7 +37,20 @@ def _install_fake_fcntl(monkeypatch) -> None:
             LOCK_NB=0,
             LOCK_UN=0,
         ),
+        raising=False,
     )
+
+
+def _held_lock_text() -> str:
+    """Read the diagnostic PID through the handle that owns the OS lock.
+
+    On Windows a byte-range lock is mandatory, so a second handle cannot read
+    the held byte; the owning handle can.
+    """
+    handle = runtime._LOCK_STATE.handle
+    assert handle is not None
+    handle.seek(0)
+    return handle.read().decode("utf-8")
 
 
 class RecordingLogger:
@@ -276,7 +290,7 @@ def test_main_releases_the_lock_and_exits_on_startup_failure(monkeypatch) -> Non
 
 def test_the_lock_records_the_process_and_is_released(lock_files) -> None:
     runtime.acquire_lock()
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
 
     runtime.release_lock()
     # The file stays in place: unlinking it would let a second process lock
@@ -290,7 +304,7 @@ def test_a_released_lock_can_be_acquired_again(lock_files) -> None:
     runtime.release_lock()
     runtime.acquire_lock()
 
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
 
 
 def test_a_live_lock_is_refused(lock_files, monkeypatch) -> None:
@@ -360,7 +374,7 @@ def test_a_stale_lock_is_replaced(lock_files, monkeypatch) -> None:
 
     runtime.acquire_lock()
 
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
 
 
 def test_a_malformed_lock_is_replaced(lock_files) -> None:
@@ -368,7 +382,7 @@ def test_a_malformed_lock_is_replaced(lock_files) -> None:
 
     runtime.acquire_lock()
 
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
 
 
 def test_a_held_lock_without_a_readable_pid_is_reported(
@@ -450,6 +464,128 @@ def test_a_lock_pid_that_cannot_be_written_is_reported(
     )
 
 
+def test_a_lock_pid_that_cannot_be_read_after_acquisition_is_reported(
+    lock_files, monkeypatch
+) -> None:
+    original = runtime._read_lock_pid
+
+    def unreadable(handle):
+        runtime._read_lock_pid = original
+        raise OSError("read failed")
+
+    monkeypatch.setattr(runtime, "_read_lock_pid", unreadable)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert runtime._LOCK_STATE.handle is None
+    assert any(
+        "Cannot use the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+    # The failed acquisition released the handle, so a later attempt succeeds.
+    runtime.acquire_lock()
+    assert _held_lock_text() == str(os.getpid())
+
+
+def test_an_os_lock_error_is_reported_as_unusable(
+    lock_files, monkeypatch
+) -> None:
+    def failed(handle):
+        raise OSError(errno.EIO, "I/O error")
+
+    monkeypatch.setattr(runtime, "_acquire_os_lock", failed)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert runtime._LOCK_STATE.handle is None
+    assert any(
+        "Cannot use the process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (BlockingIOError(errno.EAGAIN, "busy"), True),
+        (OSError(errno.EIO, "I/O error"), False),
+    ],
+)
+def test_lock_contention_classification(monkeypatch, error, expected) -> None:
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+
+    assert runtime._is_lock_contention(error) is expected
+
+
+def test_windows_lock_contention_classification(monkeypatch) -> None:
+    monkeypatch.setattr(runtime.sys, "platform", "win32")
+
+    assert runtime._is_lock_contention(OSError(errno.EACCES, "busy"))
+    assert not runtime._is_lock_contention(OSError(errno.EINVAL, "bad"))
+
+
+def test_a_huge_pid_is_unknown(monkeypatch) -> None:
+    def overflow(pid, signal):
+        raise OverflowError("pid out of range")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    monkeypatch.setattr(runtime.os, "kill", overflow)
+
+    with pytest.raises(runtime._ProcessCheckError):
+        runtime._is_process_running(2**40)
+
+
+def test_a_huge_current_lock_pid_is_not_removed(
+    lock_files, monkeypatch
+) -> None:
+    lock_files.current.write_text(str(2**40), encoding="utf-8")
+
+    def overflow(pid, signal):
+        raise OverflowError("pid out of range")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    _install_fake_fcntl(monkeypatch)
+    monkeypatch.setattr(runtime.os, "kill", overflow)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert lock_files.current.read_text(encoding="utf-8") == str(2**40)
+    assert any(
+        "cannot determine" in message.lower()
+        for level, message in runtime.logger.calls
+        if level == "critical"
+    )
+
+
+def test_a_huge_legacy_lock_pid_is_not_removed(
+    lock_files, monkeypatch
+) -> None:
+    lock_files.legacy.write_text(str(2**40), encoding="utf-8")
+
+    def overflow(pid, signal):
+        raise OverflowError("pid out of range")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    _install_fake_fcntl(monkeypatch)
+    monkeypatch.setattr(runtime.os, "kill", overflow)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert lock_files.legacy.read_text(encoding="utf-8") == str(2**40)
+    assert not lock_files.current.exists()
+
+
 @pytest.mark.parametrize("pid_text", ["0", "-1"])
 def test_a_non_positive_legacy_pid_is_removed(lock_files, pid_text) -> None:
     lock_files.legacy.write_text(pid_text, encoding="utf-8")
@@ -457,7 +593,7 @@ def test_a_non_positive_legacy_pid_is_removed(lock_files, pid_text) -> None:
     runtime.acquire_lock()
 
     assert not lock_files.legacy.exists()
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
 
 
 @pytest.mark.parametrize("raw", ["0", "-1", "not a pid", ""])
@@ -488,7 +624,7 @@ def test_a_stale_legacy_lock_is_removed(lock_files, monkeypatch) -> None:
     runtime.acquire_lock()
 
     assert not lock_files.legacy.exists()
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
     assert any(
         "Legacy lock file stale" in message
         for _, message in runtime.logger.calls
@@ -501,7 +637,7 @@ def test_a_malformed_legacy_lock_is_removed(lock_files) -> None:
     runtime.acquire_lock()
 
     assert not lock_files.legacy.exists()
-    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+    assert _held_lock_text() == str(os.getpid())
 
 
 def test_a_legacy_lock_that_cannot_be_read_is_reported(lock_files) -> None:
@@ -637,6 +773,19 @@ def test_windows_pid_probe_refuses_to_guess_when_tasklist_cannot_start(
         runtime._is_process_running(4321)
 
 
+def test_windows_pid_probe_refuses_to_guess_when_tasklist_times_out(
+    monkeypatch,
+) -> None:
+    def fake_run(args, **kwargs):
+        raise subprocess.TimeoutExpired(args, runtime._TASKLIST_TIMEOUT_SECONDS)
+
+    monkeypatch.setattr(runtime.sys, "platform", "win32")
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+
+    with pytest.raises(runtime._ProcessCheckError):
+        runtime._is_process_running(4321)
+
+
 #: A subprocess that holds the lock until the test lets it go.
 _HOLDER_SCRIPT = """
 import os
@@ -690,6 +839,19 @@ runtime.release_lock()
 """
 
 
+def _wait_for_ready(process, ready_file) -> None:
+    """Wait for the holder to publish its PID, failing on an early exit."""
+    deadline = time.monotonic() + 30
+    while not ready_file.exists():
+        if process.poll() is not None:
+            pytest.fail(
+                f"lock holder exited before acquiring (status {process.returncode})"
+            )
+        if time.monotonic() > deadline:
+            pytest.fail("lock holder did not acquire the lock in time")
+        time.sleep(0.02)
+
+
 def test_two_concurrent_acquisitions_cannot_both_succeed(tmp_path) -> None:
     lock_file = tmp_path / "bot.lock"
     legacy_file = tmp_path / "cli" / "bot.lock"
@@ -714,16 +876,7 @@ def test_two_concurrent_acquisitions_cannot_both_succeed(tmp_path) -> None:
         text=True,
     )
     try:
-        deadline = time.monotonic() + 30
-        while not ready_file.exists():
-            if holder.poll() is not None:
-                pytest.fail(
-                    "lock holder exited before acquiring "
-                    f"(status {holder.returncode})"
-                )
-            if time.monotonic() > deadline:
-                pytest.fail("lock holder did not acquire the lock in time")
-            time.sleep(0.02)
+        _wait_for_ready(holder, ready_file)
 
         contender = subprocess.run(
             [
@@ -749,3 +902,50 @@ def test_two_concurrent_acquisitions_cannot_both_succeed(tmp_path) -> None:
             holder.wait(timeout=30)
 
     assert holder.returncode == 0
+
+
+def test_an_abruptly_terminated_owner_releases_the_lock(tmp_path) -> None:
+    lock_file = tmp_path / "bot.lock"
+    legacy_file = tmp_path / "cli" / "bot.lock"
+    ready_file = tmp_path / "ready"
+    go_file = tmp_path / "go"
+
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            _HOLDER_SCRIPT,
+            str(lock_file),
+            str(legacy_file),
+            str(ready_file),
+            str(go_file),
+        ],
+        cwd=_ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    try:
+        _wait_for_ready(holder, ready_file)
+        holder.kill()
+        holder.wait(timeout=30)
+
+        contender = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                _CONTENDER_SCRIPT,
+                str(lock_file),
+                str(legacy_file),
+            ],
+            cwd=_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        assert contender.returncode == 0, contender.stderr
+    finally:
+        if holder.poll() is None:
+            holder.kill()
+            holder.wait(timeout=30)

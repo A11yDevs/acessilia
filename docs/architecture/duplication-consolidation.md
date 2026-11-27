@@ -68,6 +68,11 @@ the file is diagnostic. The runtime also recognizes the legacy
 owner cannot be inspected, such as a process owned by another user, the lock is
 kept and startup is refused; if it is stale or malformed, it is removed.
 
+The `0600` mode is best-effort: it is applied on creation and tightened on POSIX
+when possible, and it does not protect the file from removal by someone with
+write permission on the directory. The OS lock, not the mode, is the mutual
+exclusion mechanism.
+
 An old runtime predating this change takes no OS lock and still unlinks the file
 on exit, so a single in-place upgrade can still overlap an old and a new start;
 the new runtime refuses a file naming a live old PID, but it cannot prevent that

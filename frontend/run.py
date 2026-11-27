@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import csv
+import errno
 import os
 import subprocess
 import sys
@@ -39,6 +40,10 @@ LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
 # this runtime. Keep recognizing it during an in-place upgrade.
 LEGACY_LOCK_FILE = os.path.join(os.path.dirname(__file__), "cli", "bot.lock")
 
+#: Longest wait for the Windows process probe. A hung tasklist must not block
+#: startup forever; the failure is treated as unknown, never as "not running".
+_TASKLIST_TIMEOUT_SECONDS = 10
+
 
 class _LockState:
     """The open handle that holds the OS lock for this process.
@@ -67,8 +72,9 @@ def _windows_process_running(pid: int) -> bool:
             # The tool emits the OEM code page; a process name outside the
             # ANSI page must not crash the lock probe (#742 review).
             errors="replace",
+            timeout=_TASKLIST_TIMEOUT_SECONDS,
         )
-    except OSError as error:
+    except (OSError, subprocess.TimeoutExpired) as error:
         raise _ProcessCheckError(str(error)) from error
     if result.returncode != 0:
         raise _ProcessCheckError(
@@ -95,6 +101,10 @@ def _is_process_running(pid: int) -> bool:
         # Another user (or a PID namespace) owns the process. Its liveness is
         # unknown, so the caller must not treat the lock as stale (#742).
         raise _ProcessCheckError(str(error)) from error
+    except (OverflowError, ValueError) as error:
+        # A corrupt lock can name a PID outside the platform's pid_t range;
+        # it is not a process we can verify, so keep the conservative policy.
+        raise _ProcessCheckError(str(error)) from error
     except OSError as error:
         # Any other failure to probe is also unknown, never "stale".
         raise _ProcessCheckError(str(error)) from error
@@ -119,11 +129,12 @@ def _open_lock_file(path: str) -> BinaryIO:
     except OSError as error:
         logger.critical(t(LOG_LOCK_UNUSABLE).format(path=path, error=error))
         sys.exit(1)
-    if sys.platform != "win32":
+    fchmod = getattr(os, "fchmod", None)
+    if sys.platform != "win32" and fchmod is not None:
         try:
             # os.open's mode applies only on creation: tighten a lock file
             # left by an older runtime as well.
-            os.fchmod(descriptor, 0o600)
+            fchmod(descriptor, 0o600)
         except OSError:
             # The file holds only a PID; the OS lock still protects it.
             pass
@@ -139,16 +150,35 @@ def _open_lock_file(path: str) -> BinaryIO:
         sys.exit(1)
 
 
+def _is_lock_contention(error: OSError) -> bool:
+    """Whether ``error`` is the platform's normal "another holder" answer."""
+    if sys.platform == "win32":
+        # _locking reports EACCES for a held region; every other error is an
+        # unusable lock, not a holder.
+        return error.errno == errno.EACCES
+    return isinstance(error, BlockingIOError) or error.errno in {
+        errno.EAGAIN,
+        errno.EWOULDBLOCK,
+    }
+
+
 def _acquire_os_lock(handle: BinaryIO) -> bool:
-    """Take the exclusive OS lock without waiting; False when another holder has it."""
+    """Take the exclusive OS lock without waiting; False when another holder has it.
+
+    Contention is False; an OS error that is not contention is re-raised so the
+    caller can report ``LOG_LOCK_UNUSABLE`` instead of claiming an instance is
+    running when the lock itself could not be used.
+    """
     try:
         if sys.platform == "win32":
             handle.seek(0)
             msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
         else:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        return False
+    except OSError as error:
+        if _is_lock_contention(error):
+            return False
+        raise
     return True
 
 
@@ -189,7 +219,12 @@ def _check_previous_owner(handle: BinaryIO, path: str) -> None:
     not hold the OS lock: if that process is alive, starting a second instance
     would be wrong, and if its liveness cannot be checked the lock is kept.
     """
-    pid = _read_lock_pid(handle)
+    try:
+        pid = _read_lock_pid(handle)
+    except OSError as error:
+        logger.critical(t(LOG_LOCK_UNUSABLE).format(path=path, error=error))
+        _abandon_lock(handle)
+        sys.exit(1)
     if pid is None or pid == os.getpid():
         return
     try:
@@ -262,7 +297,17 @@ def acquire_lock() -> None:
     """
     _check_legacy_lock(LEGACY_LOCK_FILE)
     handle = _open_lock_file(LOCK_FILE)
-    if not _acquire_os_lock(handle):
+    try:
+        acquired = _acquire_os_lock(handle)
+    except OSError as error:
+        logger.critical(t(LOG_LOCK_UNUSABLE).format(path=LOCK_FILE, error=error))
+        try:
+            handle.close()
+        except OSError:
+            # This attempt never held the lock; closing is best-effort.
+            pass
+        sys.exit(1)
+    if not acquired:
         try:
             pid = _read_lock_pid(handle)
         except OSError:
