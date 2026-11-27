@@ -133,3 +133,19 @@ decisão.
 
 Staging não é automaticamente evidência de produção; substituir o critério
 original da #809 é uma decisão do mantenedor.
+
+## 7. Implantação e rollback
+
+- `enforce` é o modo normal. Configure
+  `TOOLBOX_AVAILABILITY_GATE=enforce` explicitamente no deploy candidato; não
+  dependa permanentemente do fallback para um valor antigo `observe`.
+- `off` é uma contingência explícita, temporária e monitorada. Ele não equivale
+  a `observe`: também deixa de ler o catálogo e de registrar os respectivos
+  diagnósticos.
+- Faça rollback para a versão anterior se as evidências de catálogo ou de plano
+  não forem aceitáveis. Confira antes a compatibilidade de checkpoints e cache:
+  um checkpoint gravado pela versão nova não é presumidamente legível por uma
+  versão antiga.
+- Monitore novos jobs, falhas de catálogo, métodos descartados, obrigações
+  críticas não satisfeitas e escalonamentos para `human-review`.
+- Registre a janela de implantação e o gatilho de rollback no log operacional.

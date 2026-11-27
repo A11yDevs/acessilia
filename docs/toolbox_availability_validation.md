@@ -130,3 +130,19 @@ before production deployment; this document does not replace that decision.
 
 Staging is not automatically production evidence; replacing the original #809
 criterion is a maintainer decision.
+
+## 7. Deployment and rollback
+
+- `enforce` is the normal mode. Set `TOOLBOX_AVAILABILITY_GATE=enforce`
+  explicitly in the candidate deployment; do not rely permanently on the
+  fallback for an old `observe` value.
+- `off` is an explicit, temporary, monitored contingency. It is not equivalent
+  to `observe`: it also stops reading the catalogue and recording its
+  diagnostics.
+- Roll back to the previous version if the catalogue or plan evidence is not
+  acceptable. Check checkpoint and cache compatibility first: a checkpoint
+  written by the new version is not assumed to be readable by an older one.
+- Monitor new jobs, catalogue failures, methods ruled out, critical
+  obligations left unsatisfied and escalations to `human-review`.
+- Record the deployment window and the rollback trigger in the operational
+  log.
