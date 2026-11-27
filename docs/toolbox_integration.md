@@ -508,23 +508,26 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 > spans) send the file again. With the remote cache on, the Toolbox can answer
 > from `cache_key` without reprocessing.
 >
-> In `FUSION_MODE=dual`, a provider failure (timeout, unavailable, or an unmapped
-> HTTP error such as 500) of either provider degrades the extraction to the
-> other one: the document carries a technical warning
-> (`extraction_degraded`, `extraction_failures`) and is not cached. A rejection
-> of the document itself (unsupported media, invalid input, contract,
-> authentication) by the primary fails the job; by the secondary, it only
-> degrades.
+> In `FUSION_MODE=dual`, a provider failure of either provider degrades the
+> extraction to the other one: a timeout, an unavailable instance, an unmapped
+> HTTP error such as 500, or a contract violation. A contract violation is
+> provider-specific in both forms: one raised by the transport (HTTP 422,
+> invalid JSON, a non-`succeeded` status) and one raised by the core's envelope
+> validation (an answer that is not an object, one whose `status` is not
+> `succeeded`, one without a `document` object, or one with a non-object
+> `provenance`). This is the same classification the SDK's
+> `extract_dual_fused` applies. The degraded document carries a technical
+> warning (`extraction_degraded`, `extraction_failures`) and is not cached. A
+> rejection of the document itself that no provider would solve (for example
+> unsupported media, invalid input or authentication) is permanent: from the
+> primary it fails the job. From the secondary it degrades when the primary's
+> result is in hand; when the primary failed, it is raised with the primary
+> failure as its cause. If both failures are provider failures, the core raises
+> a `ToolboxUnavailable` carrying both causes.
 >
-> A malformed answer is distinct from a transport-level contract rejection: an
-> answer that is not an object, one whose `status` is not `succeeded`, one
-> without a `document` object, or one with a non-object `provenance` is a
-> per-provider failure, so in dual mode the invalid primary hands over to the
-> secondary and an invalid secondary keeps the complete primary; if both are
-> malformed, the typed error propagates. The `status` case is what an injected
-> client can produce; the shipped transport rejects a non-`succeeded` answer
-> before it reaches this guard. The transport-level rejection above keeps its
-> permanence when it comes from the primary.
+> The `status` case is what an injected or duck-typed client can produce; the
+> shipped transport rejects a non-`succeeded` answer before it reaches the
+> core's guard, as a contract violation of its own.
 
 ---
 

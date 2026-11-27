@@ -689,7 +689,9 @@ def test_dual_mode_keeps_the_primary_when_the_secondary_answer_is_outside_the_co
 def test_dual_mode_raises_when_both_answers_are_outside_the_contract(
     mock_client, monkeypatch, answer
 ):
-    """#673: with no surviving provider the typed error propagates."""
+    """#673/#699: with no surviving provider both contract rejections are recorded."""
+    from acessilia_sdk.toolbox import ToolboxUnavailable
+
     mock_client.extract_structure.return_value = answer
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.provider = "mineru"
@@ -700,7 +702,7 @@ def test_dual_mode_raises_when_both_answers_are_outside_the_contract(
         lambda *a, **k: secondary,
     )
 
-    with pytest.raises(ToolboxContractViolation) as caught:
+    with pytest.raises(ToolboxUnavailable) as caught:
         ToolboxManifestExtractor(client=mock_client).extract(
             FIXTURE_PDF,
             fusion=fusion_config(mode="dual", secondary_provider="mineru"),
@@ -709,7 +711,10 @@ def test_dual_mode_raises_when_both_answers_are_outside_the_contract(
             operations=None,
         )
 
-    assert isinstance(caught.value.__cause__, ToolboxContractViolation)
+    assert [type(exc) for _, exc in caught.value.causes] == [
+        ToolboxContractViolation,
+        ToolboxContractViolation,
+    ]
     secondary.close.assert_awaited_once()
 
 
@@ -737,6 +742,29 @@ def test_identical_providers_with_an_invalid_primary_answer_raise(
         )
 
 
+def test_identical_providers_keep_a_client_raised_contract_violation_fatal(
+    mock_client, monkeypatch
+):
+    """#699: without a distinct secondary the transport's rejection is fatal."""
+    failure = ToolboxContractViolation("422 from the provider")
+    mock_client.extract_structure.side_effect = failure
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: pytest.fail("secondary must not be built"),
+    )
+
+    with pytest.raises(ToolboxContractViolation) as caught:
+        ToolboxManifestExtractor(client=mock_client).extract(
+            FIXTURE_PDF,
+            fusion=fusion_config(mode="dual", secondary_provider="docling"),
+            toolbox=toolbox_config(use_artifact_store=False),
+            paths=paths_config(),
+            operations=None,
+        )
+
+    assert caught.value is failure
+
+
 @pytest.mark.parametrize("answer", [
     None,
     {"status": "failed", "document": {"elements": []}},
@@ -760,6 +788,30 @@ def test_presentation_mode_with_an_invalid_answer_does_not_try_a_secondary(
             paths=paths_config(),
             operations=None,
         )
+
+
+def test_presentation_mode_keeps_a_client_raised_contract_violation_fatal(
+    mock_client, monkeypatch
+):
+    """#699: dual_fusion=False keeps the transport's rejection fatal too."""
+    failure = ToolboxContractViolation("422 from the provider")
+    mock_client.extract_structure.side_effect = failure
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: pytest.fail("secondary must not be built"),
+    )
+
+    with pytest.raises(ToolboxContractViolation) as caught:
+        ToolboxManifestExtractor(client=mock_client).extract(
+            FIXTURE_PDF,
+            dual_fusion=False,
+            fusion=fusion_config(mode="dual", secondary_provider="mineru"),
+            toolbox=toolbox_config(use_artifact_store=False),
+            paths=paths_config(),
+            operations=None,
+        )
+
+    assert caught.value is failure
 
 
 def test_dual_mode_uses_the_normalized_primary_in_the_identity_gate(
@@ -846,7 +898,7 @@ def test_dual_extraction_handles_each_provider_independently(
 
 @pytest.mark.parametrize("failure_name", [
     "ToolboxUnsupportedMediaType", "ToolboxInvalidInput",
-    "ToolboxAuthenticationError", "ToolboxContractViolation",
+    "ToolboxAuthenticationError",
 ])
 def test_dual_mode_preserves_permanent_primary_error(mock_client, monkeypatch, failure_name):
     from acessilia_sdk.toolbox import errors
@@ -863,6 +915,99 @@ def test_dual_mode_preserves_permanent_primary_error(mock_client, monkeypatch, f
         ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
     assert caught.value is failure
     secondary.extract_structure.assert_not_awaited()
+
+
+def test_single_mode_propagates_a_client_raised_contract_violation(mock_client, monkeypatch):
+    """#699: outside dual mode a provider's contract rejection stays fatal."""
+    failure = ToolboxContractViolation("422 from the provider")
+    mock_client.extract_structure.side_effect = failure
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: pytest.fail("single mode must not build a secondary"),
+    )
+
+    with pytest.raises(ToolboxContractViolation) as caught:
+        ToolboxManifestExtractor(client=mock_client).extract(
+            FIXTURE_PDF,
+            fusion=fusion_config(mode="single"),
+            toolbox=toolbox_config(use_artifact_store=False),
+            paths=paths_config(),
+            operations=None,
+        )
+
+    assert caught.value is failure
+
+
+def test_dual_mode_degrades_on_a_client_raised_primary_contract_violation(
+    mock_client, monkeypatch
+):
+    """#699: the transport's contract rejection is a per-provider failure, as in the SDK."""
+    mock_client.extract_structure.side_effect = ToolboxContractViolation(
+        "422 from the provider"
+    )
+    secondary_payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    secondary_payload["provider"] = "mineru"
+    secondary_payload["provenance"]["cache_key"] = "ck-mineru"
+    secondary_payload["provenance"]["provider_version"] = "mineru-1.0"
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.base_url = "http://secondary.test"
+    secondary.extract_structure.return_value = secondary_payload
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: secondary,
+    )
+
+    result = ToolboxManifestExtractor(client=mock_client).extract(
+        FIXTURE_PDF,
+        fusion=fusion_config(mode="dual", secondary_provider="mineru"),
+        toolbox=toolbox_config(use_artifact_store=False),
+        paths=paths_config(),
+        operations=None,
+    )
+
+    assert result.configuration["toolbox_provider"] == "mineru"
+    assert result.configuration["toolbox_base_url"] == "http://secondary.test"
+    assert result.configuration["extraction_degraded"] is True
+    assert result.configuration["extraction_failures"] == {
+        "docling": "ToolboxContractViolation"
+    }
+    assert result.document["provider"] == "mineru"
+    assert result.document["fusion"]["status"] == "degraded"
+    assert result.document["fusion"]["failed_providers"] == ["docling"]
+    assert result.document["fusion"]["reason"] == "ToolboxContractViolation"
+    secondary.close.assert_awaited_once()
+
+
+def test_dual_mode_raises_when_both_providers_raise_a_client_contract_violation(
+    mock_client, monkeypatch
+):
+    """#699: with no surviving provider, both contract rejections are recorded."""
+    from acessilia_sdk.toolbox import ToolboxUnavailable
+
+    primary_error = ToolboxContractViolation("422 from docling")
+    secondary_error = ToolboxContractViolation("422 from mineru")
+    mock_client.extract_structure.side_effect = primary_error
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.provider = "mineru"
+    secondary.base_url = "http://secondary.test"
+    secondary.extract_structure.side_effect = secondary_error
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: secondary,
+    )
+
+    with pytest.raises(ToolboxUnavailable) as caught:
+        ToolboxManifestExtractor(client=mock_client).extract(
+            FIXTURE_PDF,
+            fusion=fusion_config(mode="dual", secondary_provider="mineru"),
+            toolbox=toolbox_config(use_artifact_store=False),
+            paths=paths_config(),
+            operations=None,
+        )
+
+    assert [exc for _, exc in caught.value.causes] == [primary_error, secondary_error]
+    secondary.close.assert_awaited_once()
 
 
 def test_dual_mode_preserves_permanent_secondary_error_without_primary(mock_client, monkeypatch):
@@ -886,7 +1031,7 @@ def test_dual_mode_preserves_permanent_secondary_error_without_primary(mock_clie
     "ToolboxUnsupportedMediaType", "ToolboxInvalidInput",
     "ToolboxAuthenticationError", "ToolboxContractViolation",
 ])
-def test_permanent_secondary_error_keeps_the_primary_extraction(mock_client, monkeypatch, failure_name):
+def test_a_secondary_rejection_keeps_the_primary_extraction(mock_client, monkeypatch, failure_name):
     from acessilia_sdk.toolbox import errors
 
     mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE

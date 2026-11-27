@@ -7,6 +7,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Documentação** `extract_dual_fused` agora declara que todo `ToolboxError`
+  degrada, incluindo uma violação de contrato, e que o extrator do core
+  classifica uma violação de contrato do mesmo jeito no modo dual, enquanto
+  suas recusas permanentes do documento ainda derrubam o job pelo primário
+  (#699).
 - **Alterado** `DualFusionUnavailable` agora monta a mensagem padrão a partir de
   `failures`, acrescentando `provedor: ExceptionType` para cada entrada (por
   exemplo `No provider available for extraction (docling:
