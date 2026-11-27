@@ -175,6 +175,11 @@ The fields of an entry:
   `fnmatchcase`: `*` includes `/`, so `/blocks/*/text` also matches
   `/blocks/0/children/1/text`. Use restricted patterns or exact paths when
   depth matters; id binding does not change these wildcard rules.
+  The empty pointer `""` names the whole document, including root type
+  changes and root-list reordering. `"/"` names an empty property key;
+  it is not an alias for the root. Older declarations using `"/"` for a
+  whole-document change must use `""` instead. A root difference has no
+  enclosing list member, so an id-bound declaration cannot explain it.
 - `expected` is required for `added` and `changed`: a later change of the
   same field is not accepted with it.
 - `was` is optional for `removed`, and checks the value that went.
@@ -197,6 +202,14 @@ The fields of an entry:
   requires it to explain at least one difference across the cases. Entries
   under a case name must be used in that case. Prefer a case-specific entry
   for a change intended only for that case.
+
+Concrete paths consumed by `resolve` are either empty or start with `/`.
+List indices must be `0` or ASCII decimal digits without leading zeroes;
+signs, whitespace, underscores and non-ASCII digits are rejected. An invalid
+prefix/index or a missing value raises `KeyError` with the original pointer.
+These checks apply to concrete paths, not the declaration patterns matched
+by `fnmatchcase`. Validation of malformed tilde escapes is tracked in
+[#920](https://github.com/A11yDevs/acessilia/issues/920).
 
 An undeclared difference fails. A case-specific declaration that explains
 nothing in that case fails; a common declaration that explains no case

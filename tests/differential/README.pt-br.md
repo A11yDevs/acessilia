@@ -183,6 +183,12 @@ Os campos de uma entrada:
   `fnmatchcase`: `*` inclui `/`, então `/blocks/*/text` também casa com
   `/blocks/0/children/1/text`. Use padrões restritos ou caminhos exatos quando
   a profundidade importar; o vínculo por id não muda essas regras.
+  O ponteiro vazio `""` representa o documento inteiro, incluindo mudanças
+  de tipo na raiz e reordenação de listas na raiz. `"/"` representa uma
+  chave de propriedade vazia; não é um alias da raiz. Declarações antigas
+  que usam `"/"` para uma mudança do documento inteiro devem usar `""`.
+  Uma diferença na raiz não tem membro envolvente de lista, então uma
+  declaração vinculada por id não pode explicá-la.
 - `expected` é obrigatório para `added` e `changed`: uma mudança posterior do
   mesmo campo não é aceita com ele.
 - `was` é opcional para `removed` e confere o valor que saiu.
@@ -206,6 +212,14 @@ Os campos de uma entrada:
   conjunto de casos. Entradas sob o nome de um caso precisam ser usadas
   naquele caso. Prefira uma entrada específica para uma mudança pretendida
   somente para aquele caso.
+
+Caminhos concretos consumidos por `resolve` são vazios ou começam com `/`.
+Índices de listas devem ser `0` ou dígitos decimais ASCII sem zeros iniciais;
+sinais, espaços, underscores e dígitos não ASCII são rejeitados. Um prefixo
+ou índice inválido ou um valor ausente gera `KeyError` com o ponteiro original.
+Essas verificações se aplicam a caminhos concretos, não aos padrões de
+declaração casados por `fnmatchcase`. A validação de escapes de til inválidos
+está registrada na [#920](https://github.com/A11yDevs/acessilia/issues/920).
 
 Uma diferença não declarada falha. Uma declaração específica que nada
 explica naquele caso falha; uma declaração comum que nenhum caso usa
