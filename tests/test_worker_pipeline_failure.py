@@ -31,6 +31,15 @@ async def test_job_executor_does_not_export_pipeline_failure(tmp_path, monkeypat
     monkeypatch.setattr(service.agente, "execute", fail_pipeline)
     monkeypatch.setattr("backend.api.worker.criar_token", fail_if_token_created)
 
+    from backend.services import job_store
+
+    job_store.save_request(
+        task_id,
+        "token",
+        {"file": str(input_path)},
+        {"task_id": task_id, "status": "queued"},
+    )
+
     await JobExecutor().run(
         ApiJob(
             task_id=task_id,
@@ -43,6 +52,10 @@ async def test_job_executor_does_not_export_pipeline_failure(tmp_path, monkeypat
     task = state_manager.obter(task_id)
     assert task is not None
     assert task["status"] == "error"
+    # The record is written before the pipeline starts, even when it fails.
+    configuration = job_store.load_record(task_id)["configuration"]
+    assert configuration["attempt"]["resumed"] is False
+    assert configuration["provenance"]["result_origin"] == "unknown"
     assert task.get("download_url") is None
     assert not output_dir.exists()
 

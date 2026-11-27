@@ -2,6 +2,15 @@
 
 One API process owns the queue. Pending requests survive a restart; work that
 was executing is marked interrupted rather than retried with side effects.
+
+The ``configuration`` column stores the latest effective-configuration attempt
+(#380). New databases are created with it; a database from an earlier release
+gains it through ``ALTER TABLE ADD COLUMN`` on the first connection, which
+preserves every existing row. Rollback note: a release before #380 inserts with
+``INSERT INTO api_jobs VALUES (?, ?, ?, ?)`` and fails on the five-column table,
+so rolling back requires a compatible build or a controlled restore from a
+backup taken after the migration (rows written after that backup are lost). No
+column is dropped or data deleted automatically.
 """
 
 from __future__ import annotations
@@ -9,10 +18,16 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import threading
 from contextlib import contextmanager
 from typing import Any
 
 from backend.config.settings import settings
+
+#: Databases this process already inspected for the #380 column. The check runs
+#: once per database path, not once per short-lived connection.
+_migrated: set[str] = set()
+_migration_lock = threading.Lock()
 
 
 def token_digest(token: str) -> str:
@@ -25,19 +40,42 @@ def connection():
     conn = sqlite3.connect(settings.db_path, timeout=10)
     conn.row_factory = sqlite3.Row
     try:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS api_jobs (task_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, request TEXT NOT NULL, status TEXT NOT NULL)"
-        )
-        # The effective configuration of the run (#380) lives in its own
-        # column: it is written once per job start, while the status is
-        # rewritten on every stage. Existing databases gain the column here.
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(api_jobs)")}
-        if "configuration" not in columns:
-            conn.execute("ALTER TABLE api_jobs ADD COLUMN configuration TEXT")
+        _ensure_schema(conn)
         yield conn
         conn.commit()
     finally:
         conn.close()
+
+
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    """Create ``api_jobs`` with the current shape and migrate an old one.
+
+    New databases are created with ``configuration`` directly. An existing
+    database from before #380 is altered once per process and path; the
+    ``PRAGMA`` is not run on every connection. ``CREATE TABLE IF NOT EXISTS``
+    leaves an existing table untouched, so the migration is additive.
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS api_jobs (task_id TEXT PRIMARY KEY, "
+        "token_hash TEXT NOT NULL, request TEXT NOT NULL, status TEXT NOT NULL, "
+        "configuration TEXT)"
+    )
+    key = str(settings.db_path)
+    if key in _migrated:
+        return
+    with _migration_lock:
+        if key in _migrated:
+            return
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(api_jobs)")}
+        if "configuration" not in columns:
+            try:
+                conn.execute("ALTER TABLE api_jobs ADD COLUMN configuration TEXT")
+            except sqlite3.OperationalError as exc:
+                # Another process may have added it between the PRAGMA and
+                # the ALTER; that is the same end state, not a failure.
+                if "duplicate column" not in str(exc).lower():
+                    raise
+        _migrated.add(key)
 
 
 def save_request(task_id: str, token: str, request: dict, status: dict) -> None:
@@ -56,10 +94,14 @@ def save_configuration(task_id: str, configuration: dict[str, Any]) -> None:
     that did not happen.
     """
     with connection() as conn:
-        conn.execute(
+        updated = conn.execute(
             "UPDATE api_jobs SET configuration=? WHERE task_id=?",
             (json.dumps(configuration, ensure_ascii=False, sort_keys=True), task_id),
-        )
+        ).rowcount
+    if updated == 0:
+        # A missing job is a persistence failure, not a silent no-op: the
+        # caller must not believe a record it did not store is current.
+        raise LookupError("no api_jobs row for the task")
 
 
 def load_record(task_id: str) -> dict[str, Any] | None:

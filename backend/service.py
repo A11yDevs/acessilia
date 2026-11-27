@@ -30,7 +30,7 @@ from acessilia_core.pipeline.payload import (
     records_visual_failures,
 )
 from backend.agents.state_manager import TaskCancelledError, state_manager
-from backend.config.settings import settings
+from backend.config.settings import Settings, settings
 from backend.services import shutdown
 from backend.services.cache import (
     drop_cache,
@@ -87,19 +87,23 @@ def _cache_version(
     mode: str = "normal",
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
+    *,
+    settings_snapshot: Settings | None = None,
 ) -> str:
     """The processing cache's key for a job with ``config`` (#544).
 
     Built from the job's ``CoreConfig``, so a cached document is reused only
-    by a job that would produce it again.
+    by a job that would produce it again. ``settings_snapshot`` is the job's
+    snapshot; the global settings are read by default.
     """
     engine = _normalized_engine()
+    service_settings = settings_snapshot if settings_snapshot is not None else settings
     return options_cache_key(
         f"{config.models.ai_client}-{engine}-v15",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,
-        configuration=processing_cache_configuration(config),
+        configuration=processing_cache_configuration(config, settings=service_settings),
     )
 
 
@@ -152,6 +156,46 @@ def _canonical_details(payload: Any) -> tuple[dict[str, Any] | None, list[str] |
     )
 
 
+def _cache_entry_is_refused(
+    cached: dict[str, Any], metadata: dict[str, Any], service_settings: Settings
+) -> bool:
+    """Whether a cached payload must not be reused, by its recorded facts."""
+    execution_status = metadata.get("pddl_execution_status")
+    if execution_status in {"failed", "replan-required"}:
+        return True
+    if not service_settings.pddl_execute_dry_run and execution_status == "dry-run-completed":
+        return True
+    media_inspection = metadata.get("pddl_media_inspection")
+    if isinstance(media_inspection, dict) and media_inspection.get("status") == "failed":
+        return True
+    if cached.get("cacheable") is False:
+        return True
+    fusion = metadata.get("pddl_fusion") or {}
+    if fusion.get("status") == "degraded":
+        return True
+    open_obligations = metadata.get("pddl_unsatisfied_obligations") or []
+    if any(item.get("recovery") != "human-review" for item in open_obligations):
+        return True
+    if records_visual_failures(metadata.get("pddl_visual_failures")):
+        return True
+    return records_extraction_degradation(metadata.get("pddl_extraction_degraded"))
+
+
+def _usable_cache(cached: Any, service_settings: Settings) -> dict[str, Any] | None:
+    """The cached payload when ``cached`` is still reusable, otherwise None.
+
+    A run degraded by a Toolbox or model failure is marked ``cacheable: false``
+    and never written; the ``cacheable`` check also keeps that invariant
+    explicit for entries written before the flag existed.
+    """
+    if not isinstance(cached, dict):
+        return None
+    metadata = cached.get("canonical_metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    return None if _cache_entry_is_refused(cached, metadata, service_settings) else cached
+
+
 async def process(
     file_path: Path,
     status_callback: Callable[[str], Coroutine] | None = None,
@@ -163,6 +207,7 @@ async def process(
     resumed: bool = False,
     *,
     config: CoreConfig,
+    settings_snapshot: Settings | None = None,
 ) -> dict[str, Any]:
     """Process one document and return its canonical document.
 
@@ -178,6 +223,12 @@ async def process(
     ``resumed`` says the job continues from a checkpoint after a restart: the
     progress and stage the user already saw are kept instead of being reset to
     the start of the pipeline (#407).
+
+    ``settings_snapshot`` is the service settings the caller captured at the
+    job's start; the global settings are read by default. The cache variant
+    and the history's ``ai_client`` read it, so they see the same values as
+    the job's ``CoreConfig``. The pipeline engine and its orchestrator remain
+    process-level values fixed at import.
     """
     external_task_id = task_id is not None
     # Only the name, never a path the client sent.
@@ -199,33 +250,11 @@ async def process(
     )
 
     try:
-        cache_variant = _cache_version(config, mode, custom_prompt, thinking_mode)
-        cached = await get_cached(file_path, cache_variant)
-        if isinstance(cached, dict):
-            metadata = cached.get("canonical_metadata")
-            if not isinstance(metadata, dict):
-                metadata = {}
-            execution_status = metadata.get("pddl_execution_status")
-            media_inspection = metadata.get("pddl_media_inspection")
-            fusion = metadata.get("pddl_fusion") or {}
-            open_obligations = metadata.get("pddl_unsatisfied_obligations") or []
-            # A run degraded by a Toolbox or model failure is marked `cacheable: false`
-            # and never written (see below); the check here keeps that
-            # invariant explicit for entries written before the flag existed.
-            media_inspection_failed = (
-                isinstance(media_inspection, dict) and media_inspection.get("status") == "failed"
-            )
-            if (
-                execution_status in {"failed", "replan-required"}
-                or (not settings.pddl_execute_dry_run and execution_status == "dry-run-completed")
-                or media_inspection_failed
-                or cached.get("cacheable") is False
-                or fusion.get("status") == "degraded"
-                or any(item.get("recovery") != "human-review" for item in open_obligations)
-                or records_visual_failures(metadata.get("pddl_visual_failures"))
-                or records_extraction_degradation(metadata.get("pddl_extraction_degraded"))
-            ):
-                cached = None
+        service_settings = settings_snapshot if settings_snapshot is not None else settings
+        cache_variant = _cache_version(
+            config, mode, custom_prompt, thinking_mode, settings_snapshot=service_settings
+        )
+        cached = _usable_cache(await get_cached(file_path, cache_variant), service_settings)
         if cached is not None:
             logger.info("Cache hit para {}", file_path.name)
             cached = _payload_for_source(cached, file_path)
@@ -250,7 +279,7 @@ async def process(
                 await finalizar_conversao(
                     task_id=task_id,
                     status="done",
-                    pipeline=f"{settings.ai_client}-{_normalized_engine()}",
+                    pipeline=f"{service_settings.ai_client}-{_normalized_engine()}",
                     resultado_resumo=canonical_document["title"][:200],
                     tempo_segundos=time.time() - inicio,
                 )
@@ -356,7 +385,7 @@ async def process(
             await finalizar_conversao(
                 task_id=task_id,
                 status="done",
-                pipeline=f"{settings.ai_client}-{_normalized_engine()}",
+                pipeline=f"{service_settings.ai_client}-{_normalized_engine()}",
                 resultado_resumo=canonical_document["title"][:200],
                 tempo_segundos=time.time() - inicio,
             )

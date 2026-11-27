@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from acessilia_core.blocking import run_blocking
 from acessilia_core.i18n import t
@@ -26,17 +26,22 @@ async def clear_processing_cache(request: Request) -> dict[str, int]:
 
 @router.get("/operations/jobs/{task_id}/configuration")
 @limiter.limit("60/minute")
-async def job_configuration(request: Request, task_id: str) -> dict[str, Any]:
-    """The effective configuration the job's run used (#380, Etapa 0).
+async def job_configuration(
+    request: Request, response: Response, task_id: str
+) -> dict[str, Any]:
+    """The latest effective-configuration attempt of a job (#380, Etapa 0).
 
     Written once at the job's start and kept with its durable record, so a
     result can be audited after the processing cache entry is gone. It is
     privileged: the ``environment`` group names internal paths and endpoints.
+    The record is the latest successfully persisted attempt, not a history;
+    its ``attempt`` identity says which run it describes.
     """
     record = await run_blocking(load_record, task_id)
     configuration = record.get("configuration") if record else None
     if configuration is None:
         raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
+    response.headers["Cache-Control"] = "no-store"
     return configuration
 
 
