@@ -20,7 +20,7 @@ O script lê cada arquivo `.py` rastreado pelo `git` na revisão pedida, então 
 | Aresta de dependência | Um arquivo do componente A importa um módulo first-party do componente B (`acessilia_core`, `acessilia_sdk`, `docstruct`, `backend`, `frontend`); cada arquivo conta uma vez por destino, e imports relativos contam como o componente atual |
 | Fan-in / fan-out | Componentes que importam A / componentes que A importa |
 | Ciclo | Um ciclo simples no grafo de componentes |
-| Duplicata estrutural | Funções cujos corpos normalizados têm o mesmo digest SHA-256; nomes, constantes, atributos e nomes de keyword são normalizados. Uma função com vários comandos precisa de pelo menos 15 nós AST que não são de contexto, como no baseline original; um corpo de um comando precisa de 15 nós próprios, então reduzir um repassador a um comando não pode escondê-lo |
+| Duplicata estrutural | Funções com pelo menos 15 nós AST que não são de contexto e um corpo não vazio após um docstring inicial cujos corpos normalizados têm o mesmo digest SHA-256; nomes, constantes, atributos e nomes de keyword são normalizados. Desde a [#749](https://github.com/A11yDevs/acessilia/issues/749) a contagem de comandos não é critério, então um repassador de um comando recebe fingerprint como qualquer outro corpo; uma função que encolhe abaixo do piso de nós não é evidência |
 | Hotspot | As funções mais complexas e os maiores módulos |
 
 Uma duplicata estrutural é uma **candidata**, não um clone semântico. Duas funções podem compartilhar o fluxo de controle e ainda diferir em tipos, efeitos colaterais ou tratamento de erro. O total de linhas reportado é a extensão física dos membros (incluindo docstrings e assinaturas), portanto é um limite superior de lógica duplicada. O PR 2 decide quais grupos valem consolidar. Coesão (LCOM), fan-in em nível de módulo e duplicação semântica ficam deliberadamente para o PR 3; este baseline expõe as entradas para essas análises.
@@ -56,19 +56,19 @@ Nenhum ciclo entre componentes foi encontrado. Fan-in: Core 2, SDK 2, docstruct 
 
 ### Duplicatas estruturais
 
-O baseline regerado contém **38 grupos**, **91 funções** e **1.147 linhas** em grupos duplicados. O JSON foi medido de novo na mesma revisão histórica (`f812032a`) depois que a #749 mudou o detector, então os números dos componentes continuam comparáveis e só a composição dos grupos mudou. O JSON guarda os 40 maiores grupos; aqui todos os 38 cabem. Os cinco maiores grupos são:
+O baseline regerado contém **65 grupos**, **171 funções** e **1.727 linhas** em grupos duplicados. O JSON foi medido de novo na mesma revisão histórica (`f812032a`) depois que a #749 mudou o detector, então os números dos componentes continuam comparáveis e só a composição dos grupos mudou. O JSON guarda até 100 grupos, então todos os 65 cabem. Os cinco maiores grupos são:
 
 | Grupo | Linhas | Exemplos |
 |---:|---:|---|
+| 9 funções | 99 | normalizadores e helpers de ordem de leitura dos agentes do core (`FusionAgent.normalize_formula`, …) |
+| 7 funções | 87 | helpers de adjudicação do core (`OrderAdjudicationAgent.parse_order`, …) |
+| 7 funções | 32 | envelopes `process_*` dos agentes do core e helpers de payload da docstruct |
+| 7 funções | 24 | envelopes `process_*` dos agentes do core e `apply_output_profile_filter` |
 | 5 funções | 39 | handlers do Telegram no frontend `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` |
-| 5 funções | 15 | leitores de dataset gerados do SDK (`read_dataset_list`, `read_dataset_sample`, `read_dataset_splits`, …) |
-| 4 funções | 32 | leitores de histórico do backend (`listar_historico`, `listar_ocr_raw`, …) |
-| 4 funções | 33 | escritores de schema do core (`write_execution_report_schema`, `write_processing_manifest_schema`, …) |
-| 3 funções | 17 | helpers de configuração do core (`_tool_config`, `_export_config`, `_toolbox_config`) |
 
-Dois grupos cruzam componentes. O substantivo é `backend/config/settings.py::_locales_from_env` ≡ `libs/core/src/acessilia_core/i18n/__init__.py::_locales_from_raw` (2 funções, 30 linhas) — candidato à questão de responsabilidade do PR 2. O outro é trivial (`JobOperations.__init__` / `_FurnitureView.__init__`, 2 funções, 6 linhas). Os leitores de dataset do SDK vivem em `_dataset_generated.py`, cujo cabeçalho diz “do not edit by hand”; são sinal para o gerador, não para consolidação manual.
+Sete grupos cruzam componentes. O substantivo é `backend/config/settings.py::_locales_from_env` ≡ `libs/core/src/acessilia_core/i18n/__init__.py::_locales_from_raw` (2 funções, 30 linhas) — candidato à questão de responsabilidade do PR 2. Outro é o par trivial de construtores (`JobOperations.__init__` / `_FurnitureView.__init__`, 2 funções, 6 linhas). Os demais grupos entre componentes são formas de uma instrução que a #749 expôs, como `StateManager.evento_cancelamento` / `StateManager.obter` / `MethodRegistry.get` e pequenos helpers de core/docstruct. Os leitores de dataset do SDK vivem em `_dataset_generated.py`, cujo cabeçalho diz “do not edit by hand”; são sinal para o gerador, não para consolidação manual.
 
-Os demais grupos são candidatos, não veredictos: fluxo de controle normalizado igual não é equivalência semântica. O detector ignora docstrings e nós de contexto da AST. Desde a [#749](https://github.com/A11yDevs/acessilia/issues/749) um corpo substantivo de um comando recebe fingerprint em vez de isenção, então um wrapper documentado de repasse continua visível quando o temporário é embutido. O PR 2 avalia cada grupo antes de tocar no código.
+Os demais grupos são candidatos, não veredictos: fluxo de controle normalizado igual não é equivalência semântica. O detector remove docstrings do corpo normalizado e ignora nós de contexto da AST, mas o docstring ainda conta para o piso de nós da função. Desde a [#749](https://github.com/A11yDevs/acessilia/issues/749) a contagem de comandos não é critério, então um wrapper documentado de repasse continua visível quando o temporário é embutido e a função ainda atinge o piso de nós; uma forma que encolhe abaixo do piso não é evidência. O PR 2 avalia cada grupo antes de tocar no código.
 
 ### Hotspots
 
@@ -96,7 +96,7 @@ python scripts/architecture_quality.py --rev HEAD \
 python -m pytest tests/test_architecture_quality.py
 ```
 
-O JSON versionado registra o commit medido em `rev` e a versão do Python em `python`. A identidade dos grupos de duplicatas só é comparável na mesma versão minor do Python, porque `ast.dump` pode mudar com a gramática; tamanho, complexidade e arestas de dependência são estáveis. O script é apenas diagnóstico: ele sai com 0 mesmo quando os números crescem. O PR 5 decide quais medidas viram ratchet, com o fluxo de allowlist e atualização dos baselines existentes da #652 e do Ruff.
+O JSON versionado registra o commit medido em `rev` e a versão do Python em `python`; `duplication.floor_policy` registra que o piso de nós é medido na função inteira, então mudanças da política do detector ficam visíveis no próprio snapshot. A identidade dos grupos de duplicatas só é comparável na mesma versão minor do Python, porque `ast.dump` pode mudar com a gramática; tamanho, complexidade e arestas de dependência são estáveis. O script é apenas diagnóstico: ele sai com 0 mesmo quando os números crescem. O PR 5 decide quais medidas viram ratchet, com o fluxo de allowlist e atualização dos baselines existentes da #652 e do Ruff.
 
 ## O que este PR não decide
 

@@ -8,7 +8,7 @@ Este é o PR 2 da [issue #656](https://github.com/A11yDevs/acessilia/issues/656)
 
 - Um grupo estrutural só é acionável quando as funções são semanticamente intercambiáveis para os mesmos chamadores. Fluxo de controle normalizado igual não basta.
 - Código gerado é alterado pelo gerador, nunca editando o arquivo gerado.
-- O detector de duplicatas calcula o fingerprint de um corpo de uma instrução quando o próprio corpo atinge `MIN_DUPLICATE_NODES`; funções com várias instruções mantêm o piso histórico da função inteira. Um wrapper de repasse, portanto, continua visível depois que o temporário é embutido ([#749](https://github.com/A11yDevs/acessilia/issues/749)), e seu grupo é classificado como reclassificado, não consolidado.
+- O detector de duplicatas aplica `MIN_DUPLICATE_NODES` à função inteira; a contagem de instruções não é critério. Um wrapper de repasse, portanto, continua visível depois que o temporário é embutido quando a função ainda atinge o piso ([#749](https://github.com/A11yDevs/acessilia/issues/749)), e seu grupo é classificado como reclassificado, não consolidado. Uma forma que encolhe abaixo do piso de nós continua não sendo evidência.
 - Fluxos sensíveis a comportamento (seleção dos agentes, startup do frontend) precisam de teste de caracterização antes da extração.
 - Uma duplicata entre componentes precisa de um único dono. Parsing de locale é semântica de i18n e o parser genérico agora vive no SDK (`acessilia_sdk.i18n`); o core mantém catálogos e políticas, o SDK é dono do contexto de requisição e da tradução, e o serviço lê o ambiente e delega o parse.
 
@@ -164,10 +164,10 @@ validadores agora delegam para `_blank_to_none`; os testes existentes cobrem
 **Delta medido no commit de código deste PR:** 15 grupos / 34 funções / 319
 linhas → **14 grupos / 32 funções / 309 linhas**. O grupo de normalizadores do
 output schema desaparece. Os dois validadores delegadores agora têm uma
-instrução; o detector anterior à #749 os escondia, e eles voltam como um grupo
-reclassificado de uma instrução sob a política abaixo. Diferente do caso dos
-wrappers do SDK, esta é uma extração real: os dois validadores compartilham
-`_blank_to_none`.
+instrução; o detector anterior à #749 os escondia, e o piso da função inteira os
+reporta como membros de um grupo misto de uma instrução sob a política abaixo,
+não como um par isolado. Diferente do caso dos wrappers do SDK, esta é uma
+extração real: os dois validadores compartilham `_blank_to_none`.
 
 ## Oitava consolidação: o helper de SHA-256 de arquivo
 
@@ -227,9 +227,10 @@ schema de dataset cobrem documentos válidos, vazios e malformados.
 
 **Delta medido no commit de código deste PR:** 10 grupos / 24 funções / 257
 linhas → **9 grupos / 19 funções / 242 linhas**. O grupo de leitores gerados de
-dataset desaparece. Cada leitor agora tem uma instrução e continua como um grupo
-reclassificado de uma instrução; o helper compartilhado é a extração real, não o
-corpo reduzido.
+dataset desaparece. Cada leitor agora tem uma instrução, mas fica abaixo do piso
+de nós da função inteira, então o detector não o reporta; isso continua sendo
+uma limitação aceita, e o helper compartilhado é a extração real, não o corpo
+reduzido.
 
 ## Décima terceira consolidação: os shims de atributos depreciados
 
@@ -242,9 +243,10 @@ dois módulos.
 
 **Delta medido no commit de código deste PR:** 9 grupos / 19 funções / 242
 linhas → **8 grupos / 17 funções / 222 linhas**. O grupo de `__getattr__` de
-depreciação desaparece. Cada shim agora tem uma instrução e continua como um
-grupo reclassificado de uma instrução; o helper compartilhado é a extração real,
-não o corpo reduzido.
+depreciação desaparece. Cada shim agora tem uma instrução, mas fica abaixo do
+piso de nós da função inteira, então o detector não o reporta; isso continua
+sendo uma limitação aceita, e o helper compartilhado é a extração real, não o
+corpo reduzido.
 
 ## Décima quarta consolidação: o planejador construído sob demanda
 
@@ -256,9 +258,10 @@ planejador injetado.
 
 **Delta medido no commit de código deste PR:** 8 grupos / 17 funções / 222
 linhas → **7 grupos / 15 funções / 213 linhas**. O grupo da propriedade
-`planner` desaparece. Cada propriedade agora tem uma instrução e continua como
-um grupo reclassificado de uma instrução; o helper compartilhado é a extração
-real, não o corpo reduzido.
+`planner` desaparece. Cada propriedade agora tem uma instrução, mas fica abaixo
+do piso de nós da função inteira, então o detector não a reporta; isso continua
+sendo uma limitação aceita, e o helper compartilhado é a extração real, não o
+corpo reduzido.
 
 ## Décima quinta consolidação: os checkers gerados de reference
 
@@ -273,9 +276,10 @@ compartilhado.
 
 **Delta medido no commit de código deste PR:** 7 grupos / 15 funções / 213
 linhas → **6 grupos / 13 funções / 201 linhas**. O grupo de checkers gerados
-desaparece. Cada wrapper agora tem uma instrução e continua como um grupo
-reclassificado de uma instrução; o checker compartilhado é a extração real, não
-o corpo reduzido.
+desaparece. Cada wrapper agora tem uma instrução, mas fica abaixo do piso de nós
+da função inteira, então o detector não o reporta; isso continua sendo uma
+limitação aceita, e o checker compartilhado é a extração real, não o corpo
+reduzido.
 
 ## Décima sexta consolidação: os envelopes de ferramentas dos agentes
 
@@ -319,24 +323,26 @@ ação. A #749 depois tornou os delegadores de uma instrução visíveis de novo
 
 ## Política de uma instrução (#749)
 
-O detector não isenta mais um corpo com menos de duas instruções. Um corpo de
-uma instrução recebe fingerprint quando o próprio corpo atinge
-`MIN_DUPLICATE_NODES`; funções com várias instruções mantêm o piso da função
-inteira do baseline original. Medir o caso de uma instrução no corpo evita
-transformar uma assinatura longa em evidência, mantendo comparável todo grupo do
-baseline original.
+O detector não isenta mais um corpo com menos de duas instruções.
+`MIN_DUPLICATE_NODES` se aplica à função inteira, como no baseline original,
+então um repassador de uma instrução recebe fingerprint como qualquer outro
+corpo. Isso preserva todos os grupos existentes e deixa o tamanho da função
+inteira como único piso. Assinaturas longas podem, portanto, qualificar um corpo
+pequeno como candidato; isso é aceito, porque a alternativa era esconder os
+wrappers de repasse que a métrica deve expor.
 
 A consequência é que os oito acessadores tipados do SDK da quarta triagem voltam
-a ser reportados, junto com os outros delegadores de uma linha criados pelas
-consolidações acima. Eles são clones estruturais, mas não candidatos a
-consolidação: o leitor, helper ou checker compartilhado já é dono do
-comportamento. O [baseline regerado](quality-baseline.json) em `f812032a`
-reporta **38 grupos / 91 funções / 1.147 linhas**, e o código atual reporta
-**19 grupos / 43 funções / 550 linhas**. O ratchet de duplicação registra esses
-19 grupos revisados em `tests/fixtures/duplication-allowlist.json`, então um novo
-clone de uma instrução falha na CI em vez de baixar a métrica em silêncio. Os
-testes de regressão em `tests/test_architecture_quality.py` fixam um wrapper de
-repasse multilinha e o piso de tamanho do corpo.
+a ser reportados, junto com os outros delegadores de uma linha que atingem o
+piso de nós. Eles são clones estruturais, mas não candidatos a consolidação: o
+leitor, helper ou checker compartilhado já é dono do comportamento. O
+[baseline regerado](quality-baseline.json) em `f812032a` reporta **65 grupos /
+171 funções / 1.727 linhas**, e o código atual reporta **56 grupos / 155 funções
+/ 1.545 linhas**. O ratchet de duplicação registra esses 56 grupos revisados em
+`tests/fixtures/duplication-allowlist.json`, então um novo clone de uma instrução
+falha na CI em vez de baixar a métrica em silêncio. Um repassador de duas
+instruções cuja forma colapsada fica abaixo de `MIN_DUPLICATE_NODES` continua não
+sendo evidência; esse limite é deliberado e está fixado pelos testes de regressão
+em `tests/test_architecture_quality.py`.
 
 ## Classificação dos grupos restantes
 
@@ -374,7 +380,7 @@ as duas funções de depreciação `__getattr__` em `table_ast`/`validators` for
 consolidadas acima; elas eram acompanhadas separadamente das linhas do
 baseline.
 
-Os 19 grupos aceitos hoje são o par trivial de construtores anterior à #749 mais
+Os 56 grupos aceitos hoje são o par trivial de construtores anterior à #749 mais
 os delegadores de uma instrução e as formas incidentais que a #749 revelou;
 nenhum precisa de outra extração. Os grupos de agentes, config e tabela foram
 consolidados em três PRs paralelos; os grupos de planner e depreciação foram

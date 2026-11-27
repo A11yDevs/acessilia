@@ -64,12 +64,14 @@ COMPONENT_MODULES: dict[str, str] = {
     "frontend": "frontend",
 }
 
-#: The minimum non-context AST nodes for a duplicate candidate. A multi-statement
-#: function is measured whole, as in the original baseline; a one-statement body
-#: is measured on its own so a long signature cannot make a trivial wrapper count.
+#: A function needs at least this many non-context AST nodes to enter the report.
 MIN_DUPLICATE_NODES = 15
-#: The baseline keeps only the largest duplicate groups; totals cover all groups.
-MAX_DUPLICATE_GROUPS = 40
+#: Self-description of the duplicate floor for the JSON baseline.
+DUPLICATE_FLOOR_POLICY = "whole-function"
+#: The baseline keeps the largest duplicate groups; totals cover all groups.
+#: The cap is above the current and historical group counts so the ratchet can
+#: compare every group instead of silently dropping the smaller ones.
+MAX_DUPLICATE_GROUPS = 100
 #: Maximum rows in each hotspot ranking.
 MAX_HOTSPOTS = 15
 SCHEMA_VERSION = 1
@@ -218,24 +220,17 @@ def _node_count(node: ast.AST) -> int:
 
 
 def _fingerprint(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
-    """A digest of the normalized body, or ``None`` for a body below the node floor.
+    """A digest of the normalized body, or ``None`` below the duplicate floor.
 
-    A one-statement body is measured on its own, so a long signature cannot
-    turn a trivial wrapper into a duplicate. Multi-statement functions keep the
-    whole-function floor of the original baseline, so removing the statement
-    count exemption does not drop an existing group. Both policies fingerprint
-    a substantive one-statement body, so collapsing a forwarding body into one
-    statement cannot hide its group (#749).
+    The floor is the historical whole-function count, so a one-statement body
+    is not exempted just because it has fewer than two statements (#749). This
+    keeps a collapsed forwarder visible while its function still reaches
+    ``MIN_DUPLICATE_NODES``; a function that shrinks below the floor is treated
+    as non-evidence, the same as any other small body. The leading docstring is
+    removed from the fingerprint but still counts toward the function size.
     """
     statements = _body_statements(node)
-    if not statements:
-        return None
-    nodes = (
-        sum(_node_count(statement) for statement in statements)
-        if len(statements) == 1
-        else _node_count(node)
-    )
-    if nodes < MIN_DUPLICATE_NODES:
+    if not statements or _node_count(node) < MIN_DUPLICATE_NODES:
         return None
     body = ast.Module(body=copy.deepcopy(statements), type_ignores=[])
     normalized = _Shape().visit(body)
@@ -433,6 +428,7 @@ def collect(rev: str = "HEAD") -> dict[str, Any]:
         "dependency_cycles": _cycles(graph),
         "duplication": {
             "min_nodes": MIN_DUPLICATE_NODES,
+            "floor_policy": DUPLICATE_FLOOR_POLICY,
             "groups": duplicate_groups,
             "totals": duplicate_totals,
         },

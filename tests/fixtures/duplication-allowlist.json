@@ -1,6 +1,19 @@
 {
-  "reason": "Accepted remainder after #749: one-statement forwarding bodies that meet the body-size floor, reviewed as delegations or incidental shapes. Collapsing a two-statement forwarding body into one statement no longer hides the group. Physical line counts are diagnostic only: comments, blank lines and docstrings must not turn a formatting edit into duplication growth.",
+  "reason": "Accepted remainder after #749: one-statement forwarding bodies and incidental shapes that reach the whole-function node floor, plus the two independent constructors that already had no shared behaviour. Collapsing a two-statement forwarding body into one statement no longer removes the statement-count exemption; the group stays visible while the whole function still meets MIN_DUPLICATE_NODES. Physical line counts are diagnostic only: comments, blank lines and docstrings must not turn a formatting edit into duplication growth.",
   "groups": [
+    [
+      "backend/agents/state_manager.py:StateManager.evento_cancelamento",
+      "backend/agents/state_manager.py:StateManager.obter",
+      "libs/core/src/acessilia_core/execution/executor.py:MethodRegistry.get"
+    ],
+    [
+      "backend/services/cache.py:get_cached",
+      "backend/services/cache.py:get_cached_bytes"
+    ],
+    [
+      "backend/services/cache.py:set_cache",
+      "backend/services/cache.py:set_cache_bytes"
+    ],
     [
       "backend/services/history_service.py:listar_historico",
       "backend/services/history_service.py:listar_ocr_raw",
@@ -16,16 +29,168 @@
       "libs/core/src/acessilia_core/pipeline/handlers/text.py:_FurnitureView.__init__"
     ],
     [
+      "frontend/telegram/handlers/start.py:cmd_ativar",
+      "frontend/telegram/handlers/start.py:cmd_desativar"
+    ],
+    [
+      "frontend/telegram/handlers/start.py:cmd_detailed",
+      "frontend/telegram/handlers/start.py:cmd_low",
+      "frontend/telegram/handlers/start.py:cmd_medium",
+      "frontend/telegram/handlers/start.py:cmd_normal",
+      "frontend/telegram/handlers/start.py:cmd_ocr"
+    ],
+    [
+      "frontend/telegram/handlers/start.py:cmd_formats",
+      "frontend/telegram/handlers/start.py:cmd_start"
+    ],
+    [
+      "frontend/web/app.py:retired_advanced_page",
+      "frontend/web/app.py:upload_page"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/_tool_mixins.py:_JoinTail.__call__",
+      "libs/core/src/acessilia_core/agents/_tool_mixins.py:_SelectPageProcess.__call__",
+      "libs/core/src/acessilia_core/agents/_tool_mixins.py:_SwapLowAgreementProcess.__call__",
+      "libs/core/src/acessilia_core/agents/_tool_mixins.py:_TailJoin3.__call__"
+    ],
+    [
       "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.__init__",
       "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.__init__"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.decide_from_transcription",
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py:OrderAdjudicationAgent.complete_order",
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py:OrderAdjudicationAgent.kendall_tau",
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py:OrderAdjudicationAgent.parse_order",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.decide_orientation",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.page_agreement",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.upscale_factor"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.oracle_headroom",
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py:OrderAdjudicationAgent.adjudicate_order"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.process_judge_pair",
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py:TableSpecialistAgent.process_build_candidates",
+      "libs/core/src/acessilia_core/i18n/__init__.py:negotiate_server_locale",
+      "libs/sdk/src/acessilia_sdk/toolbox/results/_dataset_generated.py:_read"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.process_select_page",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.process_select_page"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.process_should_judge",
+      "libs/core/src/acessilia_core/i18n/__init__.py:_catalog_for",
+      "libs/docstruct/src/docstruct/tables/ast.py:TableComplexityMetrics.get"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.process_swap_low_agreement",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.process_swap_low_agreement"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.select_page",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.select_page"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.swap_low_agreement",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.swap_low_agreement"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.audit_document",
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.extract_line_numbers"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.join_tail",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.join_tail"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.move_header_footer_to_end",
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.normalize_formula",
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.normalize_text",
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.refine_reading_order",
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py:OrderAdjudicationAgent.refine_reading_order",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.move_header_footer_to_end",
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py:TableSpecialistAgent.extract_table",
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py:TableSpecialistAgent.is_valid_table",
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py:TableSpecialistAgent.normalize_table"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.process_audit_document",
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.process_move_header_footer_to_end",
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.process_refine_reading_order",
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py:OrderAdjudicationAgent.process_refine_reading_order",
+      "libs/core/src/acessilia_core/agents/output_schemas.py:DataOutput.normalize_empty_optional_strings",
+      "libs/core/src/acessilia_core/agents/output_schemas.py:VisionOutput.normalize_empty_formula_latex",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.process_move_header_footer_to_end",
+      "libs/core/src/acessilia_core/pipeline/canonical_builder.py:sanitize_canonical_document",
+      "libs/docstruct/src/docstruct/manifest.py:structured_document_to_payload"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py:FusionAgent.process_join_tail",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.process_join_tail"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/informational_structural.py:_tool_config",
+      "libs/core/src/acessilia_core/export/pandoc_exporter.py:_export_config",
+      "libs/core/src/acessilia_core/export/pandoc_exporter.py:_toolbox_config"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py:OrderAdjudicationAgent.process_complete_order",
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py:OrderAdjudicationAgent.process_kendall_tau",
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py:OrderAdjudicationAgent.process_parse_order",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.process_decide_orientation",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.process_page_agreement",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.process_upscale_factor",
+      "libs/docstruct/src/docstruct/export/filters.py:apply_output_profile_filter"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py:TableSpecialistAgent.process_select_greedy",
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py:TableSpecialistAgent.process_select_table"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py:TableSpecialistAgent.select_greedy",
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py:TableSpecialistAgent.select_table"
+    ],
+    [
+      "libs/core/src/acessilia_core/execution/schema.py:execution_report_schema",
+      "libs/core/src/acessilia_core/manifest/schema.py:processing_manifest_schema",
+      "libs/core/src/acessilia_core/pipeline/checkpointing.py:manifest_payload",
+      "libs/core/src/acessilia_core/planning/schema.py:nominal_plan_schema",
+      "libs/core/src/acessilia_core/planning/schema.py:planning_comparison_schema"
+    ],
+    [
+      "libs/core/src/acessilia_core/pipeline/canonical_builder.py:latex_to_mathml",
+      "libs/core/src/acessilia_core/pipeline/payload.py:_render_text_from_blocks"
+    ],
+    [
+      "libs/core/src/acessilia_core/pipeline/elements.py:_table_ast_from_metadata",
+      "libs/docstruct/src/docstruct/fusion/payload.py:_has_id"
     ],
     [
       "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py:_FormulaEnrichment.enrich_and_notify",
       "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py:_PictureEnrichment.describe_one"
     ],
     [
+      "libs/core/src/acessilia_core/pipeline/fusion.py:_structure_client",
+      "libs/core/src/acessilia_core/pipeline/obligations.py:add_table_enrichment_obligation"
+    ],
+    [
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py:_FurnitureView.box",
+      "libs/core/src/acessilia_core/toolbox/toolbox_client.py:toolbox_endpoints"
+    ],
+    [
       "libs/core/src/acessilia_core/pipeline/table_ast.py:__dir__",
       "libs/core/src/acessilia_core/pipeline/validators.py:__dir__"
+    ],
+    [
+      "libs/core/src/acessilia_core/pipeline/validators.py:validate_canonical_document",
+      "libs/sdk/src/acessilia_sdk/i18n/translation.py:gettext"
+    ],
+    [
+      "libs/core/src/acessilia_core/pipeline/validators.py:validate_export_profile",
+      "libs/core/src/acessilia_core/pipeline/validators.py:validate_output_text"
     ],
     [
       "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py:_convert_latex_async",
@@ -52,8 +217,20 @@
       "libs/docstruct/src/docstruct/fusion/repetition.py:token_norm"
     ],
     [
+      "libs/docstruct/src/docstruct/fusion/types.py:DiffBlock.as_dict",
+      "libs/docstruct/src/docstruct/policy.py:FusionPolicy.to_dict"
+    ],
+    [
+      "libs/docstruct/src/docstruct/manifest_cases.py:_first",
+      "libs/docstruct/src/docstruct/manifest_cases.py:_second"
+    ],
+    [
       "libs/docstruct/src/docstruct/policy.py:FusionPolicy.drbench_best_method",
       "libs/docstruct/src/docstruct/policy.py:FusionPolicy.drbench_v15"
+    ],
+    [
+      "libs/docstruct/src/docstruct/text/sanitize.py:contains_markdown_artifacts",
+      "libs/docstruct/src/docstruct/text/sanitize.py:contains_prompt_leak"
     ],
     [
       "libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py:ToolboxAdjudicateClient.transcribe_region",
@@ -63,6 +240,10 @@
       "libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py:ToolboxAdjudicateClient.transcribe_region_result",
       "libs/sdk/src/acessilia_sdk/toolbox/clients/pdf.py:ToolboxPdfClient.text_spans_result",
       "libs/sdk/src/acessilia_sdk/toolbox/clients/pdf_validate.py:ToolboxPdfValidateClient.validate_result"
+    ],
+    [
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py:ToolboxDatasetClient.describe_dataset_result",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py:ToolboxDatasetClient.list_splits_result"
     ],
     [
       "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py:ToolboxDatasetClient.get_item_result",
@@ -81,10 +262,15 @@
     [
       "libs/sdk/src/acessilia_sdk/toolbox/clients/layout.py:ToolboxLayoutClient.analyze_result",
       "libs/sdk/src/acessilia_sdk/toolbox/clients/structure.py:ToolboxStructureClient.extract_structure_result"
+    ],
+    [
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/math.py:ToolboxMathClient.convert_result",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/math.py:ToolboxMathClient.verbalize_result",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/media_inspect.py:ToolboxMediaInspectClient.inspect_result"
     ]
   ],
   "totals": {
-    "groups": 19,
-    "functions_in_groups": 43
+    "groups": 56,
+    "functions_in_groups": 155
   }
 }

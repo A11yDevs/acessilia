@@ -149,11 +149,7 @@ def test_a_trivial_function_has_no_duplicate_fingerprint() -> None:
 
 
 def test_a_multiline_one_statement_forwarding_wrapper_is_a_duplicate() -> None:
-    """#749: one-statement bodies are fingerprinted once they clear the size floor.
-
-    A two-statement forwarder that inlines its temporary still has the same
-    forwarding shape, so collapsing it must not remove the duplicate group.
-    """
+    """#749: one-statement bodies are fingerprinted once they clear the size floor."""
     tree = ast.parse(
         "async def transcribe_region_result(\n"
         "    self,\n"
@@ -212,7 +208,11 @@ def test_a_multiline_one_statement_forwarding_wrapper_is_a_duplicate() -> None:
 
 
 def test_collapsing_a_forwarder_to_one_statement_keeps_its_group() -> None:
-    """Inlining the temporary must not lower the duplicate total (#749)."""
+    """Inlining the temporary must not lower the duplicate total (#749).
+
+    The two-statement forwarder still has the same forwarding shape after the
+    collapse, and it stays above the whole-function node floor.
+    """
     two_statement = (
         "async def first(self):\n"
         "    result = await self.raw_call(\n"
@@ -253,8 +253,47 @@ def test_collapsing_a_forwarder_to_one_statement_keeps_its_group() -> None:
         assert totals["functions_in_groups"] == 2
 
 
-def test_a_long_signature_does_not_make_a_trivial_body_a_duplicate() -> None:
-    """The size floor measures the body, not the signature it is attached to."""
+def test_a_collapsed_forwarder_below_the_floor_is_non_evidence() -> None:
+    """The documented boundary: a shape that shrinks below the floor is ignored."""
+    before = ast.parse(
+        "async def first(self, a, b, c, d, e, f):\n"
+        "    result = await self.raw_call()\n"
+        "    return result\n"
+    ).body[0]
+    after = ast.parse(
+        "async def first(self, a, b, c, d, e, f):\n"
+        "    return await self.raw_call()\n"
+    ).body[0]
+
+    assert quality._node_count(before) >= quality.MIN_DUPLICATE_NODES
+    assert quality._fingerprint(before) is not None
+    assert quality._node_count(after) < quality.MIN_DUPLICATE_NODES
+    assert quality._fingerprint(after) is None
+
+
+def test_the_duplicate_floor_is_inclusive() -> None:
+    """The whole-function floor includes the boundary value itself."""
+    below = cast(
+        ast.FunctionDef,
+        ast.parse(
+            "def wrapper(a, b, c, d, e, f, g, h, i, j):\n    return value\n"
+        ).body[0],
+    )
+    at_floor = cast(
+        ast.FunctionDef,
+        ast.parse(
+            "def wrapper(a, b, c, d, e, f, g, h, i, j, k):\n    return value\n"
+        ).body[0],
+    )
+
+    assert quality._node_count(below) == quality.MIN_DUPLICATE_NODES - 1
+    assert quality._node_count(at_floor) == quality.MIN_DUPLICATE_NODES
+    assert quality._fingerprint(below) is None
+    assert quality._fingerprint(at_floor) is not None
+
+
+def test_a_docstring_only_body_has_no_duplicate_fingerprint() -> None:
+    """A docstring is not a logical statement, even when the signature is large."""
     node = cast(
         ast.FunctionDef,
         ast.parse(
@@ -268,9 +307,11 @@ def test_a_long_signature_does_not_make_a_trivial_body_a_duplicate() -> None:
             "    seventh,\n"
             "    eighth,\n"
             "    ninth,\n"
-            "    *, keyword=None,\n"
+            "    tenth,\n"
+            "    eleventh,\n"
+            "    twelfth,\n"
             "):\n"
-            "    return value\n"
+            '    """Only documentation."""\n'
         ).body[0],
     )
 
@@ -319,6 +360,7 @@ def test_the_committed_baseline_has_the_expected_shape() -> None:
         assert metrics["functions"] > 0, component
     assert data["dependency_cycles"] == []
     assert data["duplication"]["min_nodes"] == quality.MIN_DUPLICATE_NODES
+    assert data["duplication"]["floor_policy"] == quality.DUPLICATE_FLOOR_POLICY
     assert isinstance(data["duplication"]["groups"], list)
     assert data["duplication"]["totals"]["groups"] >= len(data["duplication"]["groups"])
     assert data["hotspots"]["functions"]

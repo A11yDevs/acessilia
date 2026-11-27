@@ -9,7 +9,7 @@ This is PR 2 of [issue #656](https://github.com/A11yDevs/acessilia/issues/656). 
 
 - A structural group is actionable only when the functions are semantically interchangeable for the same callers. Equal normalized control flow is not enough.
 - Generated code is changed through its generator, never by editing the generated file.
-- The duplicate detector fingerprints a one-statement body when the body itself meets `MIN_DUPLICATE_NODES`; multi-statement functions keep the historical whole-function floor. A forwarding wrapper therefore stays visible after its temporary is inlined ([#749](https://github.com/A11yDevs/acessilia/issues/749)), and its group is classified as reclassified rather than consolidated.
+- The duplicate detector applies `MIN_DUPLICATE_NODES` to the whole function; the statement count is not a criterion. A forwarding wrapper therefore stays visible after its temporary is inlined when the function still meets the floor ([#749](https://github.com/A11yDevs/acessilia/issues/749)), and its group is classified as reclassified rather than consolidated. A shape that shrinks below the node floor remains non-evidence.
 - Behaviour-sensitive flows (agent selection, frontend startup) need a characterization test before extraction.
 - A cross-component duplicate needs a single owner. Locale parsing is i18n semantics and the generic parser now lives in the SDK (`acessilia_sdk.i18n`); the core keeps catalogs and policies, the SDK owns request context and translation, and the service reads the environment and delegates the parse.
 
@@ -160,9 +160,10 @@ and `caption`.
 **Measured delta on this PR's code commit:** 15 groups / 34 functions / 319
 lines → **14 groups / 32 functions / 309 lines**. The output-schema normalizer
 group disappears. Both delegating validators now have one statement; the
-pre-#749 detector hid them, and they return as a reclassified one-statement
-group under the policy below. Unlike the SDK wrapper case, this is a real
-extraction: both validators share `_blank_to_none`.
+pre-#749 detector hid them, and the whole-function floor reports them as members
+of a mixed one-statement group under the policy below, not as a standalone pair.
+Unlike the SDK wrapper case, this is a real extraction: both validators share
+`_blank_to_none`.
 
 ## Eighth consolidation: the file SHA-256 helper
 
@@ -222,8 +223,9 @@ tests cover valid, empty and malformed documents.
 
 **Measured delta on this PR's code commit:** 10 groups / 24 functions / 257
 lines → **9 groups / 19 functions / 242 lines**. The generated dataset-reader
-group disappears. Each reader is now one statement and remains a reclassified
-one-statement group; the shared helper is the actual extraction, not the
+group disappears. Each reader is now one statement but stays below the
+whole-function node floor, so the detector does not report it; this remains an
+accepted limitation, and the shared helper is the actual extraction, not the
 collapsed body.
 
 ## Thirteenth consolidation: the deprecation attribute shims
@@ -237,8 +239,9 @@ modules.
 
 **Measured delta on this PR's code commit:** 9 groups / 19 functions / 242
 lines → **8 groups / 17 functions / 222 lines**. The deprecation `__getattr__`
-group disappears. Each shim is now one statement and remains a reclassified
-one-statement group; the shared helper is the actual extraction, not the
+group disappears. Each shim is now one statement but stays below the
+whole-function node floor, so the detector does not report it; this remains an
+accepted limitation, and the shared helper is the actual extraction, not the
 collapsed body.
 
 ## Fourteenth consolidation: the lazily built planner
@@ -251,8 +254,9 @@ injected planner.
 
 **Measured delta on this PR's code commit:** 8 groups / 17 functions / 222
 lines → **7 groups / 15 functions / 213 lines**. The planner-property group
-disappears. Each property is now one statement and remains a reclassified
-one-statement group; the shared helper is the actual extraction, not the
+disappears. Each property is now one statement but stays below the
+whole-function node floor, so the detector does not report it; this remains an
+accepted limitation, and the shared helper is the actual extraction, not the
 collapsed body.
 
 ## Fifteenth consolidation: the generated reference checkers
@@ -267,9 +271,10 @@ behaviour; a direct generator test pins the shared checker.
 
 **Measured delta on this PR's code commit:** 7 groups / 15 functions / 213
 lines → **6 groups / 13 functions / 201 lines**. The generated checker group
-disappears. Each wrapper is now one statement and remains a reclassified
-one-statement group; the shared checker is the actual extraction, not the
-collapsed body.
+disappears. Each wrapper is now one statement but stays below the whole-function
+node floor, so the detector does not report it; this remains an accepted
+limitation, and the shared checker is the actual extraction, not the collapsed
+body.
 
 ## Sixteenth consolidation: the agent tool envelopes
 
@@ -313,24 +318,26 @@ action. #749 later made the one-statement delegates visible again.
 
 ## One-statement policy (#749)
 
-The detector no longer exempts a body with fewer than two statements. A
-one-statement body is fingerprinted when the body itself meets
-`MIN_DUPLICATE_NODES`; multi-statement functions keep the whole-function floor
-of the original baseline. Measuring the one-statement case on the body avoids
-turning a long signature into evidence, while keeping every group in the
-original baseline comparable.
+The detector no longer exempts a body with fewer than two statements.
+`MIN_DUPLICATE_NODES` applies to the whole function, as it did for the original
+baseline, so a one-statement forwarder is fingerprinted like any other body.
+This preserves every existing group and makes the whole-function size the only
+floor. Long signatures can therefore qualify a small body as a candidate; that
+is accepted, because the alternative was hiding the forwarding wrappers the
+metric is meant to expose.
 
 The consequence is that the eight typed SDK accessors from the fourth triage
-are reported again, together with the other one-line delegates created by the
-consolidations above. They are structural clones but not consolidation
-candidates: the shared reader, helper or checker already owns the behaviour. The
-[regenerated baseline](quality-baseline.json) at `f812032a` reports **38 groups /
-91 functions / 1,147 lines**, and the current code reports **19 groups / 43
-functions / 550 lines**. The duplication ratchet records those 19 reviewed
+are reported again, together with the other one-line delegates that reach the
+node floor. They are structural clones but not consolidation candidates: the
+shared reader, helper or checker already owns the behaviour. The
+[regenerated baseline](quality-baseline.json) at `f812032a` reports **65 groups /
+171 functions / 1,727 lines**, and the current code reports **56 groups / 155
+functions / 1,545 lines**. The duplication ratchet records those 56 reviewed
 groups in `tests/fixtures/duplication-allowlist.json`, so a new one-statement
-clone fails CI instead of silently lowering the metric. The regression tests in
-`tests/test_architecture_quality.py` pin a multi-line forwarding wrapper and the
-body-size floor.
+clone fails CI instead of silently lowering the metric. A two-statement
+forwarder whose collapsed form falls below `MIN_DUPLICATE_NODES` is still
+non-evidence; that boundary is deliberate and pinned by the regression tests in
+`tests/test_architecture_quality.py`.
 
 ## Classification of the remaining groups
 
@@ -367,7 +374,7 @@ the orchestrator and the planning engine introduced by #632 and the two
 deprecation `__getattr__` functions in `table_ast`/`validators` were
 consolidated above; they were tracked separately from the baseline rows.
 
-The 19 groups currently accepted are the pre-#749 trivial constructor pair plus
+The 56 groups currently accepted are the pre-#749 trivial constructor pair plus
 the one-statement delegates and incidental shapes that #749 surfaced; none needs
 another extraction. The agent, config and table groups were consolidated in
 three parallel PRs; the planner and deprecation groups were consolidated
