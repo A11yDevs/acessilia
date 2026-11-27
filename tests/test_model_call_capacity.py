@@ -40,6 +40,7 @@ def _isolated_dirs(monkeypatch, tmp_path) -> None:
 def test_the_default_pending_capacity_covers_the_configured_jobs(monkeypatch, tmp_path):
     _isolated_dirs(monkeypatch, tmp_path)
     monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "5")
+    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", "true")
     monkeypatch.setenv("VISION_CONCURRENCY", "2")
     monkeypatch.setenv("MODEL_CALL_WORKERS", "4")
     monkeypatch.delenv("MODEL_CALL_MAX_PENDING", raising=False)
@@ -56,6 +57,7 @@ def test_an_explicit_pending_capacity_too_small_for_the_jobs_is_reported():
     configured = replace(
         settings,
         queue_max_concurrent=5,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=4,
         model_call_max_pending=4,
@@ -73,6 +75,7 @@ def test_capacity_that_covers_the_jobs_is_not_reported():
     configured = replace(
         settings,
         queue_max_concurrent=5,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=4,
         model_call_max_pending=6,
@@ -85,8 +88,60 @@ def test_the_queue_uses_the_configured_concurrency():
     assert unified_queue.max_concurrent == settings.queue_max_concurrent
 
 
+def test_multi_job_concurrency_requires_the_experimental_opt_in(monkeypatch, tmp_path):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "2")
+    monkeypatch.delenv("QUEUE_MULTI_JOB_EXPERIMENTAL", raising=False)
+
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        Settings()
+
+
+@pytest.mark.parametrize("value", ["false", "0", "no", "off"])
+def test_a_false_opt_in_does_not_enable_multi_job(monkeypatch, tmp_path, value):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "2")
+    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", value)
+
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        Settings()
+
+
+def test_the_experimental_opt_in_allows_multi_job(monkeypatch, tmp_path):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "2")
+    monkeypatch.setenv("QUEUE_MULTI_JOB_EXPERIMENTAL", "true")
+
+    configured = Settings()
+
+    assert configured.queue_max_concurrent == 2
+    assert configured.queue_multi_job_experimental is True
+
+
+def test_single_job_concurrency_does_not_require_the_opt_in(monkeypatch, tmp_path):
+    _isolated_dirs(monkeypatch, tmp_path)
+    monkeypatch.setenv("QUEUE_MAX_CONCURRENT", "1")
+    monkeypatch.delenv("QUEUE_MULTI_JOB_EXPERIMENTAL", raising=False)
+
+    configured = Settings()
+
+    assert configured.queue_max_concurrent == 1
+    assert configured.queue_multi_job_experimental is False
+
+
+def test_the_gate_cannot_be_bypassed_with_a_direct_setting():
+    with pytest.raises(ValueError, match="QUEUE_MULTI_JOB_EXPERIMENTAL=true"):
+        replace(
+            settings,
+            queue_max_concurrent=2,
+            queue_multi_job_experimental=False,
+        )
+
+
 def test_a_queue_built_from_settings_uses_its_concurrency():
-    configured = replace(settings, queue_max_concurrent=3)
+    configured = replace(
+        settings, queue_max_concurrent=3, queue_multi_job_experimental=True
+    )
 
     assert create_unified_queue(configured).max_concurrent == 3
 
@@ -114,6 +169,7 @@ def test_the_minus_one_sentinel_derives_the_pending_floor():
     configured = replace(
         settings,
         queue_max_concurrent=5,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=4,
         model_call_max_pending=-1,
@@ -135,6 +191,7 @@ async def test_queue_jobs_use_the_derived_model_call_capacity(tmp_path):
     configured = replace(
         settings,
         queue_max_concurrent=2,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=1,
     )
@@ -211,6 +268,7 @@ def test_the_startup_warning_is_logged_once_per_process(monkeypatch):
     configured = replace(
         settings,
         queue_max_concurrent=5,
+        queue_multi_job_experimental=True,
         vision_concurrency=2,
         model_call_workers=4,
         model_call_max_pending=4,

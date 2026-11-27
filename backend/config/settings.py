@@ -115,6 +115,18 @@ class Settings:
     queue_max_concurrent: int = field(
         default_factory=lambda: int(os.getenv("QUEUE_MAX_CONCURRENT", "1"))
     )
+    # Explicit acknowledgement required to run more than one job at once. The
+    # admission-capacity sizing in #590 is not enough: #238 W1 still owes
+    # per-source fairness, a public cancellation API and the memory/failure
+    # isolation decisions. Keeping the gate separate from
+    # ``QUEUE_MAX_CONCURRENT`` means a deployment cannot enable multi-job mode
+    # by changing one sizing value alone.
+    queue_multi_job_experimental: bool = field(
+        default_factory=lambda: (
+            os.getenv("QUEUE_MULTI_JOB_EXPERIMENTAL", "false").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
+    )
     # Process-wide model execution capacity, independent of transient loops.
     model_call_workers: int = field(
         default_factory=lambda: int(os.getenv("MODEL_CALL_WORKERS", "4"))
@@ -617,6 +629,14 @@ class Settings:
         if self.queue_max_concurrent < 1:
             raise ValueError(
                 f"QUEUE_MAX_CONCURRENT must be positive, got {self.queue_max_concurrent}"
+            )
+        if self.queue_max_concurrent > 1 and not self.queue_multi_job_experimental:
+            raise ValueError(
+                "QUEUE_MAX_CONCURRENT greater than 1 requires "
+                "QUEUE_MULTI_JOB_EXPERIMENTAL=true: multi-job execution stays "
+                "experimental until #238 W1 adds per-source fairness, a public "
+                "cancellation API and the memory/failure-isolation decisions. "
+                "Keep QUEUE_MAX_CONCURRENT=1 in production."
             )
         if self.model_call_workers < 1:
             raise ValueError(

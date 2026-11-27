@@ -69,7 +69,11 @@ warning names the exact pending capacity that closes the gap. Over capacity is
 a degraded mode, not an unsafe one, and the stages may use fewer calls than
 their bound. The formula assumes a job's enrichment subplans stay sequential, so
 one stage bound applies at a time; parallel subplans would need a new aggregate
-budget (#828).
+budget (#828). Sizing the admission capacity does not make multi-job execution
+safe, so `QUEUE_MAX_CONCURRENT` above 1 stays gated behind the explicit
+`QUEUE_MULTI_JOB_EXPERIMENTAL=true` opt-in until #238 W1 supplies per-source
+fairness, a public cancellation API and the memory/failure-isolation decisions
+(#830).
 
 A rejection is admission pressure, not provider health. It is retried once
 like a timeout, without consuming an answer attempt; if it persists, the stage
