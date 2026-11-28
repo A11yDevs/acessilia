@@ -172,6 +172,19 @@ class StateManager:
         if task:
             task["download_url"] = url
 
+    def definir_tentativa(
+        self, task_id: str, attempt_id: str, captured_at: str
+    ) -> None:
+        """Record the attempt the job is running now (#944).
+
+        ``captured_at`` lets the audit tell a later attempt whose snapshot
+        write failed from an older status left by a failed status write.
+        """
+        task = self._tasks.get(task_id)
+        if task is not None and attempt_id:
+            task["current_attempt_id"] = attempt_id
+            task["current_attempt_captured_at"] = captured_at
+
     def expirar_tarefas_terminais(
         self, max_age_seconds: int, now: float | None = None
     ) -> int:

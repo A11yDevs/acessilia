@@ -9,7 +9,6 @@ from uuid import uuid4
 import aiofiles
 import aiofiles.os
 
-from acessilia_core.config import CoreConfig
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_CACHE_CLEARED,
@@ -18,6 +17,11 @@ from acessilia_core.i18n.log_messages import (
     LOG_CACHE_SAVE_FAILED,
 )
 from acessilia_core.logger import logger
+from backend.config.processing_identity import (
+    MANIFEST_INVARIANT_REVISION,
+    SERVICE_PROCESSING_SETTINGS,
+    processing_cache_configuration,
+)
 from backend.services.cache_lock import cache_directory_lock
 
 CACHE_DIR = Path("var/temp/cache")
@@ -25,10 +29,6 @@ CACHE_DIR = Path("var/temp/cache")
 # another process. Track this process's writers regardless of file age.
 CACHE_TEMP_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 
-#: Bump when ``document_invariant_findings`` starts rejecting manifests that
-#: were accepted and cached under the previous rules. It is part of the
-#: processing-cache identity, so old entries are not reopened and rejected.
-MANIFEST_INVARIANT_REVISION = "2026-11-14"
 _active_cache_writes: set[Path] = set()
 
 
@@ -57,47 +57,6 @@ def _content_key(content: bytes, extra: str = "") -> str:
 
 def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
-
-
-#: Service options a processed document depends on, outside the core's
-#: ``CoreConfig``: the engine, the planner and the model revision.
-SERVICE_PROCESSING_SETTINGS = (
-    "pipeline_engine", "fusion_hybrid_provider", "processing_model_revision",
-    "pddl_execute_dry_run", "pddl_max_replans", "pddl_planner_backend",
-    "pddl_preferred_plan", "pddl_fast_downward", "pddl_fast_downward_alias",
-    "pddl_fast_downward_search",
-)
-
-
-def processing_cache_configuration(config: CoreConfig, *, settings: Any = None) -> dict[str, Any]:
-    """What a processed document depends on: the run's ``config`` (#544) and
-    the service's own options, with the manifest rules and the PDDL domain.
-
-    ``settings`` is the service's ``Settings``; the global one by default. It is
-    explicit so the effective-configuration record (#380) can read the same
-    values a test replaces.
-    """
-    from acessilia_core.pipeline.orchestrator import DEFAULT_MAX_DISCOVERY_REPLANS
-    from acessilia_core.run_identity import processing_identity
-    from backend.config.settings import settings as default_settings
-
-    service_settings = default_settings if settings is None else settings
-    configuration: dict[str, Any] = {"core": processing_identity(config)}
-    configuration.update({
-        name: getattr(service_settings, name) for name in SERVICE_PROCESSING_SETTINGS
-    })
-    # Only a bound other than the default enters the key, so the documents
-    # cached before the setting existed keep theirs (#832).
-    if service_settings.pddl_max_discovery_replans != DEFAULT_MAX_DISCOVERY_REPLANS:
-        configuration["pddl_max_discovery_replans"] = (
-            service_settings.pddl_max_discovery_replans
-        )
-    configuration["manifest_invariant_revision"] = MANIFEST_INVARIANT_REVISION
-    from acessilia_core.planning.domain_bundle import DomainBundle
-
-    domain = DomainBundle.load()
-    configuration["pddl_domain"] = (domain.domain_sha256, domain.description_sha256)
-    return configuration
 
 
 async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Any:
@@ -243,3 +202,10 @@ async def clear_cache() -> int:
             continue
     logger.info(t(LOG_CACHE_CLEARED).format(count=count))
     return count
+
+
+__all__ = [
+    "MANIFEST_INVARIANT_REVISION",
+    "SERVICE_PROCESSING_SETTINGS",
+    "processing_cache_configuration",
+]

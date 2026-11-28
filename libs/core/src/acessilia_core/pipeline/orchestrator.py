@@ -49,6 +49,7 @@ from acessilia_core.manifest.models import (
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import (
     RunCheckpoints,
+    load_execution_state,
     manifest_payload,
     restored_admission_deferred_ids,
     resumed_manifest,
@@ -352,7 +353,8 @@ class PddlAccessibilityOrchestrator:
             config=config,
             ports=ports,
             checkpoints=RunCheckpoints(
-                ports.checkpoints, config, options=self._checkpoint_options()
+                ports.checkpoints, config, options=self._checkpoint_options(),
+                outcome=ports.outcome,
             ),
         )
 
@@ -368,7 +370,7 @@ class PddlAccessibilityOrchestrator:
         )
         planning = await self._load_or_build_plan(ctx, manifest)
 
-        execution_state = self._load_execution_state(ctx.checkpoints, planning.plan)
+        execution_state = load_execution_state(ctx.checkpoints, planning.plan)
         if status_callback and execution_state is None:
             await status_callback(
                 t(STAGE_VALIDATING_PLAN_DRY_RUN)
@@ -435,8 +437,10 @@ class PddlAccessibilityOrchestrator:
         """
         media_state = ctx.checkpoints.load(PHASE_MEDIA)
         if media_state is not None:
+            configuration = dict(media_state.get("configuration") or {})
             ctx.ports.services.media_inspection = media_state.get("inspection")
-            return media_state.get("inspection"), dict(media_state.get("configuration") or {})
+            ctx.checkpoints.accept(PHASE_MEDIA)
+            return media_state.get("inspection"), configuration
         # media.inspect runs first: a slide deck is extracted and structured
         # slide by slide, which has to be decided before extraction.
         media_inspection, media_configuration = await _inspect_media(
@@ -471,6 +475,8 @@ class PddlAccessibilityOrchestrator:
         _check_page_limit(manifest, ctx.config.document)
         manifest.extractor.configuration["region_inspection_mode"] = ctx.effective_mode
         manifest.extractor.configuration.update(media_configuration)
+        if resumed_manifest:
+            ctx.checkpoints.accept(PHASE_MANIFEST)
         if not resumed_manifest:
             # Saved after the page limit and the media configuration: an
             # oversized document must not leave a checkpoint to resume from.
@@ -492,6 +498,7 @@ class PddlAccessibilityOrchestrator:
             # configuration is re-applied so a changed default is still visible.
             manifest.extractor.configuration["region_inspection_mode"] = ctx.effective_mode
             manifest.extractor.configuration.update(media_configuration)
+            ctx.checkpoints.accept(PHASE_ENRICHED)
             return manifest
         await self._enrich_before_planning(manifest, media_inspection, ctx.checkpoints)
         # The formula regions (#640, M4a), the pictures (M1), the formula
@@ -520,7 +527,7 @@ class PddlAccessibilityOrchestrator:
                     availability.mode,
                     current,
                 )
-            return _PlanningState(
+            planning = _PlanningState(
                 plan=NominalPlan.model_validate(plan_state["plan"]),
                 comparison=(
                     PlanningComparison.model_validate(plan_state["comparison"])
@@ -535,6 +542,8 @@ class PddlAccessibilityOrchestrator:
                 previous_signature=plan_state.get("previous_signature"),
                 admission_deferred_ids=restored_admission_deferred_ids(plan_state),
             )
+            ctx.checkpoints.accept(PHASE_PLAN)
+            return planning
         if ctx.status_callback:
             await ctx.status_callback(t(STAGE_GENERATING_PDDL_PLAN))
         # One catalogue snapshot per document, so the first plan and every
@@ -555,19 +564,6 @@ class PddlAccessibilityOrchestrator:
             gated=gated,
             replans=0,
         )
-
-    @staticmethod
-    def _load_execution_state(
-        checkpoints: RunCheckpoints, plan: NominalPlan
-    ) -> dict[str, Any] | None:
-        """The execution checkpoint of ``plan``, ``None`` when it belongs to another plan."""
-        execution_state = checkpoints.load(PHASE_EXECUTION)
-        if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
-            # The plan checkpoint was replaced after this execution checkpoint
-            # was written (a replan that crashed before it started). The old
-            # progress does not apply to the new plan.
-            return None
-        return execution_state
 
     async def _run_plan(
         self,
@@ -593,6 +589,7 @@ class PddlAccessibilityOrchestrator:
                 replan_required=bool(execution_state.get("replan_required")),
                 remaps=list(execution_state.get("remaps") or []),
             )
+            checkpoints.accept(PHASE_EXECUTION)
         on_step = (
             checkpoints.execution_saver(plan, resumed=execution_state)
             if checkpoints.active and not self.execute_dry_run

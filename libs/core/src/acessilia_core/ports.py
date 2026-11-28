@@ -157,6 +157,25 @@ class RunServices:
         return self._items[key]
 
 
+@dataclass
+class RunOutcome:
+    """What one run reused or produced, for the service's audit record (#944).
+
+    Mutable and per run: the core records a phase when a checkpoint is reused,
+    and the service reads the object after ``execute`` to store the attempt's
+    result. ``unknown`` until evidence exists; a caller never infers an origin
+    without it.
+    """
+
+    result_origin: Literal["produced", "cache", "resumed", "unknown"] = "unknown"
+    reused_phases: list[str] = field(default_factory=list)
+
+    def mark_reused(self, phase: str) -> None:
+        """Record that ``phase`` came from a checkpoint of this job."""
+        if phase not in self.reused_phases:
+            self.reused_phases.append(phase)
+
+
 @dataclass(frozen=True)
 class RunPorts:
     """The service state one run reaches, built by its caller for that job."""
@@ -169,6 +188,8 @@ class RunPorts:
     operations: RemoteOperations | None
     #: What the run's stages and methods share; a new run gets its own.
     services: RunServices = field(default_factory=RunServices)
+    #: What the run reused or produced; the service reads it after the run.
+    outcome: RunOutcome = field(default_factory=RunOutcome)
 
     @classmethod
     def none(cls) -> RunPorts:
@@ -195,6 +216,7 @@ __all__ = [
     "OperationKind",
     "RegionCache",
     "RemoteOperations",
+    "RunOutcome",
     "RunPorts",
     "RunServices",
     "region_cache_for",

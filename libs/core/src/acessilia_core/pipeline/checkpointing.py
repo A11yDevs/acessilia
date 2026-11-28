@@ -30,6 +30,7 @@ from acessilia_core.ports import (
     PHASE_MEDIA,
     PHASE_PLAN,
     JobCheckpoints,
+    RunOutcome,
 )
 from acessilia_core.run_identity import STAGE_FIELDS, stage_identity
 
@@ -67,11 +68,15 @@ class RunCheckpoints:
         config: CoreConfig,
         *,
         options: Mapping[str, Mapping[str, Any]] | None = None,
+        outcome: RunOutcome | None = None,
     ) -> None:
         """``options`` are the run's own options outside ``config``, by stage
         (the orchestrator's planner and dry run); the port's ``options``
-        add the service's (its model revision). Both enter the identities."""
+        add the service's (its model revision). Both enter the identities.
+
+        ``outcome`` records the phases a resumed run actually reused (#944)."""
         self._checkpoints = checkpoints
+        self._outcome = outcome
         self._identity: dict[str, str] = {}
         if checkpoints is not None:
             port_options = getattr(checkpoints, "options", None) or {}
@@ -125,6 +130,17 @@ class RunCheckpoints:
             )
             return None
         return payload
+
+    def accept(self, phase: str) -> None:
+        """Record that the caller adopted the checkpoint of ``phase`` (#944).
+
+        ``load`` only returns the payload: a phase can still be discarded by
+        the caller's content checks (an execution checkpoint from another
+        plan, for example). Only an accepted phase is provenance.
+        """
+        if self._outcome is None:
+            return
+        self._outcome.mark_reused(phase)
 
     def _stamp(self, payload: dict[str, Any], stages: Iterable[str]) -> dict[str, Any]:
         payload[IDENTITY_KEY] = {stage: self._identity[stage] for stage in stages}
@@ -237,6 +253,22 @@ def restored_admission_deferred_ids(payload: dict[str, Any]) -> tuple[str, ...]:
     if not isinstance(raw, list):
         return ()
     return tuple(item for item in raw if isinstance(item, str))
+
+
+def load_execution_state(
+    checkpoints: RunCheckpoints, plan: NominalPlan
+) -> dict[str, Any] | None:
+    """The execution checkpoint of ``plan``, ``None`` when it belongs to another plan.
+
+    A checkpoint from another plan is loaded but not accepted as provenance:
+    its progress does not apply to the new plan and it is not reused.
+    """
+    execution_state = checkpoints.load(PHASE_EXECUTION)
+    if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
+        return None
+    # Matching the plan is only a precondition: _run_plan validates the manifest
+    # and results and accepts this payload after constructing ExecutionResume.
+    return execution_state
 
 
 def resumed_manifest(execution_state: dict[str, Any], plan: NominalPlan) -> dict[str, Any]:
@@ -366,6 +398,7 @@ __all__ = [
     "PHASE_STAGES",
     "RunCheckpoints",
     "manifest_payload",
+    "load_execution_state",
     "restored_admission_deferred_ids",
     "resumed_manifest",
 ]

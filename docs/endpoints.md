@@ -41,19 +41,47 @@ Defined in [backend/api/app.py](../backend/api/app.py), with routes in [backend/
 | GET | `/api/v1/logs` | Lists the application log files still retained. Requires `Authorization: Bearer <OBSERVABILITY_API_TOKEN>`. | JSON `{files: [{name, size_bytes}]}`. | 30/min |
 | GET | `/api/v1/logs/{filename}` | Downloads a complete log file, including older `.zip` archives. Requires the same token. | File download; `404` if absent. | 30/min |
 | POST | `/api/v1/cache/clear` | Removes the published processing-cache entries. Requires `Authorization: Bearer <OPERATIONS_API_TOKEN>`. | JSON `{removed}`. | 10/min |
-| GET | `/api/v1/operations/jobs/{task_id}/configuration` | The effective configuration the job's run used, grouped into `processing`, `operational` and `environment`, with `secrets_omitted` naming the credentials left out. Requires `Authorization: Bearer <OPERATIONS_API_TOKEN>`. | JSON record; `404` if the job or its record is missing. | 60/min |
+| GET | `/api/v1/audit/jobs/{task_id}/configuration` | The job's latest attempt, grouped into `processing`, `operational` and `environment`, with `secrets_omitted` naming the credentials left out and `provenance` carrying the result origin and reused phases. `current` says whether it is the job's current attempt. Requires `Authorization: Bearer <AUDIT_API_TOKEN>`. | JSON record; `404` if the job or its record is missing. | 60/min |
+| GET | `/api/v1/audit/jobs/{task_id}/configuration/attempts` | Every attempt of the job, oldest first, with its immutable configuration, state, origin and reused phases. Requires the same audit token. | JSON `{current_attempt_id, attempts}`. | 30/min |
 
 `OBSERVABILITY_API_TOKEN` is a read-only password set in `.env` for history, statistics and logs; leaving it empty disables them. Send it in the header, for example: `curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/v1/logs`. Use HTTPS or a private network to protect the token and log contents. The log routes serve only `bot_*` files in `LOGS_DIR`, within the logger's configured retention period (30 days). Analysis tools can download the files without depending on a particular observability stack. Uvicorn access logs remain available through `docker compose logs`.
 
 `OPERATIONS_API_TOKEN` is a write-capable password set in `.env` for privileged operations; leaving it empty disables the routes. Invalid or missing credentials return 401. The Telegram bot calls the cache route only for the operators listed in `TELEGRAM_ADMIN_IDS` (see [telegram.md](telegram.md#23-commands)).
 
-The job-configuration route returns the latest persisted attempt, not a history. `attempt` identifies it (`id`, `captured_at`, `resumed`); `provenance.result_origin` is `unknown` when the result may have come from the cache or a checkpoint. The record is minimised for audit: URL userinfo, query strings and fragments are removed, while the scheme, host, port and path are kept so deployments can be told apart. A credential placed in a path segment is not detected, so deployments must not embed credentials or sensitive identifiers in endpoint paths; check `TOOLBOX_BASE_URL(S)`, `OLLAMA_BASE_URL`, `OPENROUTER_BASE_URL`, `API_BASE_URL` and `WEB_BASE_URL` before deploying. A custom prompt is stored as a SHA-256 fingerprint and character count, never verbatim. `secrets_omitted` and `not_recorded` list, respectively, the credentials left out and the settings outside the run with their reasons. Availability follows the job record's retention; the response is sent with `Cache-Control: no-store`.
+`AUDIT_API_TOKEN` is a read-only password for the audit routes; leaving it empty disables them (503), and invalid credentials return 401. The operations token is deliberately not accepted: an auditor can read the configuration without the cache-clearing privilege (#946). It must differ from `OPERATIONS_API_TOKEN` and `OBSERVABILITY_API_TOKEN` when set; equal values are rejected at startup.
+
+**Migration from #942:** the old `/api/v1/operations/jobs/{task_id}/configuration` route was removed. Configure `AUDIT_API_TOKEN` and use `/api/v1/audit/jobs/{task_id}/configuration`; the operations token no longer reads it. The persisted snapshot keeps the `acessilia/effective-configuration@2` schema; the audit response adds `attempt.state`, `attempt.finished_at`, `provenance.result_origin`, `provenance.reused_phases` and `current`.
+
+The configuration route returns the latest persisted attempt; the attempts route returns the append-only history. `attempt` identifies each attempt (`id`, `captured_at`, `resumed`, `state`). `provenance.result_origin` is `produced`, `cache`, `resumed` or `unknown`, and `provenance.reused_phases` names the checkpoints a resumed run reused. The origin describes how the canonical document was obtained; it is `unknown` when no canonical document was obtained, while `attempt.state` records the terminal outcome (a delivery failure after the canonical result may leave a known origin and a failed state). The configuration snapshot never claims the origin itself. `current` is true when the latest persisted attempt is the job's current one, false when a later attempt started but its snapshot could not be written, and null for a legacy record from before per-attempt snapshots. The record is minimised for audit: URL userinfo, query strings and fragments are removed, while the scheme, host, port and path are kept so deployments can be told apart. A credential placed in a path segment is not detected, so deployments must not embed credentials or sensitive identifiers in endpoint paths; check `TOOLBOX_BASE_URL(S)`, `OLLAMA_BASE_URL`, `OPENROUTER_BASE_URL`, `API_BASE_URL` and `WEB_BASE_URL` before deploying. In the audit snapshot, a custom prompt is stored as a SHA-256 fingerprint and character count, never verbatim; the durable job request may still keep the original prompt so a resumed job can use it. A fingerprint is minimisation, not anonymisation: a short, known prompt can be confirmed by comparing hashes. `secrets_omitted` and `not_recorded` list, respectively, the credentials left out and the settings outside the run with their reasons. Attempts follow the job record's lifecycle: deleting the job record (the `delete_request` path, also used when a submission rolls back) removes them. There is no automatic expiry separate from the job record, so a deployment that retains job rows indefinitely also retains their attempts; backups inherit the same policy. At rest, the record lives in the same SQLite file as the job history and inherits its file permissions, disk protection and backup policy. The responses are sent with `Cache-Control: no-store`.
 
 Observations:
 
 - **Errors are always JSON** (`{"detail": "..."}`): `400` validation, `404` not found, `429` rate limit, `500` internal error. There is a global per-IP limit in addition to the per-route ones.
 - The `pipeline` field in history records the AI client and the engine that ran the job, as `<ai_client>-<engine>` (for example `ollama-pddl`). The engine is `pddl` for every current job, although jobs submitted through the API record the raw `PIPELINE_ENGINE` value, so the `pmv` alias shows up as `ollama-pmv`; `legacy` appears only in records from before that engine was disabled (see `PIPELINE_ENGINE` in [architecture.md](architecture.md)).
 - Standard interactive FastAPI docs at `GET /docs` and `GET /openapi.json`.
+
+**Storage and recovery boundaries:** The additive SQLite migration, including
+preservation of the original #942 configuration JSON, commits under the migration
+lock before a connection is handed to a reader/writer. Its process-local success
+marker is set only after commit; failure remains retryable. An audit read starts
+its own independent consistent read transaction. Checkpoint provenance is marked
+only after the actual payload is adopted: execution requires successful
+`ProcessingManifest`/`ExecutionStepResult` validation and `ExecutionResume`
+construction, not merely a matching plan id. Media configuration conversion must
+succeed too.
+
+After download publication, the completed attempt and `done` job status (including
+the download link) share one SQLite transaction. Graceful shutdown after that
+boundary keeps the published output and terminal status, rather than turning it
+into resumable work. Audit failure or a missing attempt snapshot falls back to
+best-effort terminal-status persistence; neither may delete a published result.
+An abrupt crash before terminal status is durably committed remains indeterminate:
+recovery follows the existing checkpoint/resubmission policy. A completed audit
+row alone never proves a valid delivered file/token; old inconsistent rows do not
+cause recovery to invent a download or overwrite a terminal attempt. This is not
+a transaction across SQLite, filesystem, download service and email, nor an
+exactly-once delivery guarantee. Producer identity and operational retention
+remain separate work in #957 and #958.
 
 ### Job access, processing options and recovery
 

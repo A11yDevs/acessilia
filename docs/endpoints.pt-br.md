@@ -41,19 +41,47 @@ Definida em [backend/api/app.py](../backend/api/app.py), com as rotas em [backen
 | GET | `/api/v1/logs` | Lista os arquivos de log retidos pela aplicação. Requer `Authorization: Bearer <OBSERVABILITY_API_TOKEN>`. | JSON `{files: [{name, size_bytes}]}`. | 30/min |
 | GET | `/api/v1/logs/{filename}` | Baixa um arquivo de log completo, inclusive arquivos `.zip` de dias anteriores. Requer o mesmo token. | Arquivo para download; `404` se não existir. | 30/min |
 | POST | `/api/v1/cache/clear` | Remove as entradas publicadas do cache de processamento. Requer `Authorization: Bearer <OPERATIONS_API_TOKEN>`. | JSON `{removed}`. | 10/min |
-| GET | `/api/v1/operations/jobs/{task_id}/configuration` | A configuração efetiva usada pelo processamento do job, agrupada em `processing`, `operational` e `environment`, com `secrets_omitted` nomeando as credenciais deixadas de fora. Requer `Authorization: Bearer <OPERATIONS_API_TOKEN>`. | Registro JSON; `404` se o job ou seu registro não existir. | 60/min |
+| GET | `/api/v1/audit/jobs/{task_id}/configuration` | A última tentativa do job, agrupada em `processing`, `operational` e `environment`, com `secrets_omitted` nomeando as credenciais deixadas de fora e `provenance` com a origem do resultado e as fases reaproveitadas. `current` indica se é a tentativa atual do job. Requer `Authorization: Bearer <AUDIT_API_TOKEN>`. | Registro JSON; `404` se o job ou seu registro não existir. | 60/min |
+| GET | `/api/v1/audit/jobs/{task_id}/configuration/attempts` | Todas as tentativas do job, da mais antiga para a mais recente, com a configuração imutável, estado, origem e fases reaproveitadas. Requer o mesmo token de auditoria. | JSON `{current_attempt_id, attempts}`. | 30/min |
 
 `OBSERVABILITY_API_TOKEN` é uma senha de leitura definida no `.env` para histórico, estatísticas e logs; vazio, elas ficam desabilitadas. Envie-a no cabeçalho, por exemplo: `curl -H "Authorization: Bearer SEU_TOKEN" http://localhost:8000/api/v1/logs`. Use HTTPS ou uma rede privada para não expor a senha e o conteúdo. As rotas de logs servem apenas arquivos `bot_*` em `LOGS_DIR`, dentro da retenção configurada pelo logger (30 dias). Ferramentas de análise podem baixar os arquivos e processá-los sem depender de uma stack específica. Os logs de acesso do Uvicorn continuam disponíveis em `docker compose logs`.
 
 `OPERATIONS_API_TOKEN` é uma senha com permissão de escrita definida no `.env` para operações privilegiadas; vazio, as rotas ficam desabilitadas. Credenciais inválidas ou ausentes retornam 401. O bot do Telegram chama a rota de cache apenas para os operadores listados em `TELEGRAM_ADMIN_IDS` (veja [telegram.pt-br.md](telegram.pt-br.md#23-comandos)).
 
-A rota de configuração do job devolve a última tentativa persistida, não um histórico. `attempt` identifica a tentativa (`id`, `captured_at`, `resumed`); `provenance.result_origin` é `unknown` quando o resultado pode ter vindo do cache ou de um checkpoint. O registro é minimizado para auditoria: userinfo, query e fragmento das URLs são removidos, enquanto esquema, host, porta e caminho são mantidos para distinguir deployments. Uma credencial colocada em um segmento do caminho não é detectada, então os deployments não devem embutir credenciais ou identificadores sensíveis nos caminhos dos endpoints; verifique `TOOLBOX_BASE_URL(S)`, `OLLAMA_BASE_URL`, `OPENROUTER_BASE_URL`, `API_BASE_URL` e `WEB_BASE_URL` antes de implantar. Um prompt personalizado é gravado como fingerprint SHA-256 e contagem de caracteres, nunca literalmente. `secrets_omitted` e `not_recorded` listam, respectivamente, as credenciais deixadas de fora e as configurações fora do run com seus motivos. A disponibilidade acompanha a retenção do registro do job; a resposta vai com `Cache-Control: no-store`.
+`AUDIT_API_TOKEN` é uma senha somente leitura para as rotas de auditoria; vazio, elas ficam desabilitadas (503), e credenciais inválidas retornam 401. O token de operações não é aceito de propósito: um auditor lê a configuração sem o privilégio de limpar o cache (#946). Ele precisa ser diferente de `OPERATIONS_API_TOKEN` e `OBSERVABILITY_API_TOKEN` quando configurado; valores iguais são recusados na inicialização.
+
+**Migração a partir da #942:** a rota antiga `/api/v1/operations/jobs/{task_id}/configuration` foi removida. Configure `AUDIT_API_TOKEN` e use `/api/v1/audit/jobs/{task_id}/configuration`; o token de operações não lê mais essa rota. O snapshot persistido mantém o schema `acessilia/effective-configuration@2`; a resposta de auditoria acrescenta `attempt.state`, `attempt.finished_at`, `provenance.result_origin`, `provenance.reused_phases` e `current`.
+
+A rota de configuração devolve a última tentativa persistida; a rota de tentativas devolve o histórico append-only. `attempt` identifica cada tentativa (`id`, `captured_at`, `resumed`, `state`). `provenance.result_origin` é `produced`, `cache`, `resumed` ou `unknown`, e `provenance.reused_phases` nomeia os checkpoints reaproveitados numa retomada. A origem descreve como o documento canônico foi obtido; é `unknown` quando nenhum documento canônico foi obtido, enquanto `attempt.state` registra o desfecho terminal (uma falha de entrega após o resultado canônico pode deixar origem conhecida e estado failed). O snapshot de configuração não afirma a origem sozinho. `current` é verdadeiro quando a última tentativa persistida é a atual do job, falso quando uma tentativa posterior começou mas seu snapshot não pôde ser gravado, e nulo para um registro legado anterior aos snapshots por tentativa. O registro é minimizado para auditoria: userinfo, query e fragmento das URLs são removidos, enquanto esquema, host, porta e caminho são mantidos para distinguir deployments. Uma credencial colocada em um segmento do caminho não é detectada, então os deployments não devem embutir credenciais ou identificadores sensíveis nos caminhos dos endpoints; verifique `TOOLBOX_BASE_URL(S)`, `OLLAMA_BASE_URL`, `OPENROUTER_BASE_URL`, `API_BASE_URL` e `WEB_BASE_URL` antes de implantar. No snapshot de auditoria, um prompt personalizado é gravado como fingerprint SHA-256 e contagem de caracteres, nunca literalmente; a solicitação durável do job pode manter o prompt original para uma retomada. Um fingerprint é minimização, não anonimização: um prompt curto e conhecido pode ser confirmado pela comparação de hashes. `secrets_omitted` e `not_recorded` listam, respectivamente, as credenciais deixadas de fora e as configurações fora do run com seus motivos. As tentativas acompanham o ciclo de vida do registro do job: apagar o registro (o caminho `delete_request`, também usado quando uma submissão é desfeita) remove as tentativas. Não há expiração automática separada do registro do job, então um deployment que mantém as linhas de job indefinidamente também mantém suas tentativas; backups herdam a mesma política. Em repouso, o registro fica no mesmo arquivo SQLite do histórico de jobs e herda suas permissões de arquivo, proteção de disco e política de backup. As respostas vão com `Cache-Control: no-store`.
 
 Observações:
 
 - **Erros sempre em JSON** (`{"detail": "..."}`): `400` validação, `404` não encontrado, `429` rate limit, `500` erro interno. Há um limite global por IP além dos por rota.
 - O campo `pipeline` no histórico registra o cliente de IA e o motor que rodou o job, no formato `<ai_client>-<engine>` (por exemplo `ollama-pddl`). O motor é `pddl` em todo job atual, mas os jobs enviados pela API gravam o valor bruto de `PIPELINE_ENGINE`, então o alias `pmv` aparece como `ollama-pmv`; `legacy` só aparece em registros de antes de esse motor ser desativado (veja `PIPELINE_ENGINE` em [architecture.pt-br.md](architecture.pt-br.md)).
 - Documentação interativa padrão do FastAPI em `GET /docs` e `GET /openapi.json`.
+
+**Fronteiras de armazenamento e recuperação:** A migração aditiva do SQLite,
+incluindo a preservação do JSON original da configuração do #942, é consolidada
+sob a trava de migração antes de entregar a conexão ao leitor/escritor. A marca
+de sucesso em memória só é definida depois do commit; falhas permitem nova
+tentativa. A leitura de auditoria abre sua própria transação consistente. A
+proveniência do checkpoint só é marcada depois do aceite efetivo do conteúdo:
+a execução exige validar `ProcessingManifest`/`ExecutionStepResult` e construir
+`ExecutionResume`, além de conferir o id do plano. A conversão da configuração
+de mídia também precisa concluir.
+
+Após a publicação do download, a tentativa concluída e o status `done` do job,
+incluindo o link, compartilham uma transação SQLite. Shutdown cooperativo após
+essa fronteira preserva arquivos e status terminal, sem torná-los trabalho
+retomável. Falha da auditoria ou ausência do snapshot aciona a persistência best
+effort do status terminal; nenhuma delas pode apagar um resultado publicado.
+Um crash abrupto antes de consolidar esse status permanece indeterminado:
+a recuperação segue a política existente de checkpoint/reenvio. Uma linha de
+auditoria concluída, sozinha, não prova arquivo/token de entrega válido; registros
+antigos inconsistentes não fazem a recuperação inventar um download nem
+sobrescrever uma tentativa terminal. Não há transação entre SQLite, filesystem,
+serviço de downloads e e-mail, nem garantia de entrega exatamente uma vez.
+Identidade do produtor e retenção operacional permanecem separadas nas #957/#958.
 
 ### Acesso aos jobs, opções de processamento e recuperação
 

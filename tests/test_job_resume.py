@@ -464,11 +464,15 @@ async def test_a_resumed_run_restores_progress_and_skips_the_confirmation(
 
     assert seen == [stage]
     confirmation.assert_not_awaited()
-    # The resumed attempt replaced the record and says so (#380).
-    from backend.services.job_store import load_record
+    # The resumed attempt appended a new row and says so (#380, #944).
+    from backend.services.job_store import load_attempts, load_record
 
     configuration = load_record("resume-run")["configuration"]
     assert configuration["attempt"]["resumed"] is True
+    attempts = load_attempts("resume-run")
+    assert len(attempts) == 1
+    assert attempts[0]["resumed"] is True
+    assert attempts[0]["state"] == "failed"
     # The job is terminal now: its checkpoints must not be reused.
     assert job_checkpoint.resumable("resume-run") is False
 
@@ -490,6 +494,62 @@ async def test_resumption_can_be_disabled_without_a_code_revert(
 
     assert load_record("no-resume")["status"]["status"] == "error"
     assert isolated_worker.qsize() == 0
+
+
+
+
+@pytest.mark.asyncio
+async def test_recovery_closes_an_attempt_left_started_by_a_dead_process(
+    isolated_worker, monkeypatch, tmp_path
+):
+    from backend.api.worker import recover_pending_jobs
+    from backend.services.job_store import load_attempts, save_attempt_start
+
+    path = tmp_path / "doc.pdf"
+    path.write_bytes(b"%PDF")
+    _save_processing_job("abandoned", path)
+    configuration = {
+        "schema": "acessilia/effective-configuration@2",
+        "attempt": {"id": "dead-attempt", "captured_at": "2026-11-27T10:00:00+00:00", "resumed": False},
+    }
+    save_attempt_start(
+        "abandoned",
+        {"id": "dead-attempt", "captured_at": "2026-11-27T10:00:00+00:00", "resumed": False},
+        configuration,
+    )
+
+    await recover_pending_jobs()
+
+    [attempt] = load_attempts("abandoned")
+    assert attempt["state"] == "interrupted"
+    assert attempt["origin"] == "unknown"
+    assert attempt["error_type"] == "process-restart"
+    assert attempt["configuration"] == configuration
+
+
+@pytest.mark.asyncio
+async def test_recovery_closes_an_attempt_before_resuming_the_job(
+    isolated_worker, monkeypatch, tmp_path
+):
+    from backend.api.worker import recover_pending_jobs
+    from backend.services.job_store import load_attempts, save_attempt_start
+
+    path = tmp_path / "doc.pdf"
+    path.write_bytes(b"%PDF")
+    _save_processing_job("resume-abandoned", path)
+    job_checkpoint.save("resume-abandoned", PHASE_MANIFEST, {"manifest": {}})
+    save_attempt_start(
+        "resume-abandoned",
+        {"id": "dead-attempt", "captured_at": "2026-11-27T10:00:00+00:00", "resumed": False},
+        {"schema": "acessilia/effective-configuration@2", "attempt": {"id": "dead-attempt"}},
+    )
+
+    await recover_pending_jobs()
+
+    assert isolated_worker.qsize() == 1
+    [attempt] = load_attempts("resume-abandoned")
+    assert attempt["state"] == "interrupted"
+    assert attempt["configuration"]["attempt"]["id"] == "dead-attempt"
 
 
 def test_a_cancel_cannot_slip_between_the_check_and_the_registration(

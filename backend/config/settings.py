@@ -85,6 +85,12 @@ class Settings:
     operations_api_token: str = field(
         default_factory=lambda: os.getenv("OPERATIONS_API_TOKEN", "")
     )
+    #: Bearer token for the read-only audit routes. Empty disables them; it is
+    #: separate from OPERATIONS_API_TOKEN so a researcher can read the record
+    #: without the write-capable cache route (#946).
+    audit_api_token: str = field(
+        default_factory=lambda: os.getenv("AUDIT_API_TOKEN", "")
+    )
     #: Telegram user ids allowed to run the operator commands. Empty denies all.
     telegram_admin_ids: frozenset[int] = field(
         default_factory=lambda: _int_set_from_env("TELEGRAM_ADMIN_IDS")
@@ -657,6 +663,14 @@ class Settings:
                 f"QUEUE_MAX_CONCURRENT must be positive, got {self.queue_max_concurrent}"
             )
         self.validate_queue_concurrency()
+        if self.audit_api_token and self.audit_api_token == self.operations_api_token:
+            raise ValueError(
+                "AUDIT_API_TOKEN must differ from OPERATIONS_API_TOKEN"
+            )
+        if self.audit_api_token and self.audit_api_token == self.observability_api_token:
+            raise ValueError(
+                "AUDIT_API_TOKEN must differ from OBSERVABILITY_API_TOKEN"
+            )
         if self.model_call_workers < 1:
             raise ValueError(
                 f"MODEL_CALL_WORKERS must be positive, got {self.model_call_workers}"

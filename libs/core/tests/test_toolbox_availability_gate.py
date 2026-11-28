@@ -515,7 +515,10 @@ async def test_a_resumed_plan_keeps_the_snapshot_it_was_built_under(monkeypatch)
         "availability": json.loads(json.dumps(built_under.to_metadata())),
     }
     ctx = SimpleNamespace(
-        checkpoints=SimpleNamespace(load=lambda phase: state if phase == PHASE_PLAN else None),
+        checkpoints=SimpleNamespace(
+            load=lambda phase: state if phase == PHASE_PLAN else None,
+            accept=lambda phase: None,
+        ),
         config=_config(gate="enforce"),
     )
 
@@ -565,6 +568,7 @@ async def test_a_resumed_observe_plan_keeps_its_assumed_facts(monkeypatch) -> No
         checkpoints=SimpleNamespace(
             job_id="job-legacy",
             load=lambda phase: state if phase == PHASE_PLAN else None,
+            accept=lambda phase: None,
         ),
         config=_config(gate="enforce"),
     )

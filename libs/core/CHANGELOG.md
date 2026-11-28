@@ -2,6 +2,16 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.32 — evidence of accepted checkpoint reuse (#944, #951)
+
+`RunOutcome` exposes the run's observed canonical origin and accepted checkpoint
+phases to its host, without persistence or service dependencies. Loading a
+matching execution checkpoint is not reuse: the orchestrator marks it only after
+validating its manifest/results and building `ExecutionResume`. Invalid media
+configuration is also refused before provenance is marked. Accepted legacy
+checkpoints retain the existing compatibility policy and are recorded once.
+The SDK, Toolbox contracts and PDDL domain are unchanged.
+
 ## 0.3.31 — remote one-pass normalization (#929)
 
 Review follow-up: normalization journal slots also bind endpoints and the

@@ -301,56 +301,211 @@ def test_cache_clear_declares_bearer_auth_in_openapi(client):
     ]
 
 
-def test_job_configuration_requires_the_bearer_token(client, monkeypatch):
-    monkeypatch.setattr(settings, "operations_api_token", "secret")
+def test_audit_configuration_requires_the_audit_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "audit_api_token", "audit-secret")
+    monkeypatch.setattr(settings, "operations_api_token", "operations-secret")
 
-    assert client.get("/api/v1/operations/jobs/task/configuration").status_code == 401
-    # A job token authorizes the job's own status, never the privileged record.
+    url = "/api/v1/audit/jobs/task/configuration"
+
+    assert client.get(url).status_code == 401
+    # A job token authorizes the job's own status, never the audit record.
+    assert client.get(url, headers={"X-Job-Token": "job-token"}).status_code == 401
+    # The write-capable operations token must not read the audit record (#946).
     assert (
         client.get(
-            "/api/v1/operations/jobs/task/configuration",
-            headers={"X-Job-Token": "job-token"},
+            url, headers={"Authorization": "Bearer operations-secret"}
         ).status_code
         == 401
     )
     assert (
-        client.get(
-            "/api/v1/operations/jobs/task/configuration",
-            headers={"Authorization": "Bearer wrong"},
-        ).status_code
+        client.get(url, headers={"Authorization": "Bearer wrong"}).status_code
         == 401
     )
 
 
-def test_job_configuration_returns_a_real_record(client, monkeypatch):
+def test_audit_token_cannot_clear_the_cache(client, monkeypatch):
+    monkeypatch.setattr(settings, "audit_api_token", "audit-secret")
+    monkeypatch.setattr(settings, "operations_api_token", "operations-secret")
+
+    response = client.post(
+        "/api/v1/cache/clear", headers={"Authorization": "Bearer audit-secret"}
+    )
+
+    assert response.status_code == 401
+
+
+def test_audit_configuration_is_disabled_without_a_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "audit_api_token", "")
+
+    response = client.get("/api/v1/audit/jobs/task/configuration")
+
+    assert response.status_code == 503
+
+
+def test_audit_configuration_is_disabled_in_pt_br_without_a_token(
+    client, monkeypatch
+):
+    from acessilia_core.i18n import t
+    from acessilia_core.i18n.log_messages import API_AUDIT_NOT_CONFIGURED
+
+    monkeypatch.setattr(settings, "audit_api_token", "")
+    use_server_locale(monkeypatch, "pt_BR")
+
+    response = client.get("/api/v1/audit/jobs/task/configuration")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == t(API_AUDIT_NOT_CONFIGURED)
+
+
+def test_audit_legacy_record_fills_the_documented_fields(client, monkeypatch):
     from backend.services import job_store
 
-    monkeypatch.setattr(settings, "operations_api_token", "secret")
+    monkeypatch.setattr(settings, "audit_api_token", "audit-secret")
+    job_store.save_request(
+        "legacy-route",
+        "job-token",
+        {"file": "a.pdf"},
+        {"task_id": "legacy-route", "status": "done"},
+    )
+    # A #942 record: a configuration column and no attempt row. Using the
+    # same connection avoids the migration (already done for this database).
+    with job_store.connection() as conn:
+        conn.execute(
+            "UPDATE api_jobs SET configuration=? WHERE task_id=?",
+            (
+                json.dumps(
+                    {
+                        "schema": "acessilia/effective-configuration@2",
+                        "attempt": {"id": "legacy-a", "captured_at": "", "resumed": False},
+                        "provenance": {"result_origin": "unknown", "note": "legacy"},
+                        "processing": {},
+                    }
+                ),
+                "legacy-route",
+            ),
+        )
+
+    response = client.get(
+        "/api/v1/audit/jobs/legacy-route/configuration",
+        headers={"Authorization": "Bearer audit-secret"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["current"] is None
+    assert body["attempt"]["state"] is None
+    assert body["attempt"]["finished_at"] is None
+    assert body["provenance"]["reused_phases"] == []
+
+
+def test_audit_configuration_returns_the_latest_attempt(client, monkeypatch):
+    from backend.services import job_store
+
+    monkeypatch.setattr(settings, "audit_api_token", "audit-secret")
     job_store.save_request(
         "config-task",
         "job-token",
         {"file": "a.pdf"},
-        {"task_id": "config-task", "status": "done"},
+        {"task_id": "config-task", "status": "processing"},
     )
-    job_store.save_configuration(
+    job_store.save_attempt_start(
         "config-task",
-        {"schema": "acessilia/effective-configuration@2", "attempt": {"id": "attempt-1"}},
+        {
+            "id": "attempt-a",
+            "captured_at": "2026-11-27T10:00:00+00:00",
+            "resumed": False,
+        },
+        {"schema": "acessilia/effective-configuration@2", "attempt": {"id": "attempt-a"}},
     )
-    headers = {"Authorization": "Bearer secret"}
+    job_store.save_attempt_result(
+        "config-task",
+        "attempt-a",
+        state="completed",
+        origin="cache",
+        reused_phases=[],
+    )
+    job_store.save_attempt_start(
+        "config-task",
+        {
+            "id": "attempt-b",
+            "captured_at": "2026-11-27T10:05:00+00:00",
+            "resumed": True,
+        },
+        {"schema": "acessilia/effective-configuration@2", "attempt": {"id": "attempt-b"}},
+    )
+    job_store.save_attempt_result(
+        "config-task",
+        "attempt-b",
+        state="completed",
+        origin="resumed",
+        reused_phases=["manifest", "enriched"],
+    )
+    headers = {"Authorization": "Bearer audit-secret"}
 
     response = client.get(
-        "/api/v1/operations/jobs/config-task/configuration", headers=headers
+        "/api/v1/audit/jobs/config-task/configuration", headers=headers
     )
 
     assert response.status_code == 200
-    assert response.json()["attempt"]["id"] == "attempt-1"
+    body = response.json()
+    assert body["attempt"]["id"] == "attempt-b"
+    assert body["attempt"]["resumed"] is True
+    assert body["attempt"]["state"] == "completed"
+    assert body["provenance"]["result_origin"] == "resumed"
+    assert body["provenance"]["reused_phases"] == ["manifest", "enriched"]
+    assert body["current"] is True
     assert response.headers["cache-control"] == "no-store"
+
+    history = client.get(
+        "/api/v1/audit/jobs/config-task/configuration/attempts", headers=headers
+    )
+    assert history.status_code == 200
+    attempts = history.json()["attempts"]
+    assert [item["attempt"]["id"] for item in attempts] == ["attempt-a", "attempt-b"]
+    assert attempts[0]["provenance"]["result_origin"] == "cache"
+
     assert (
         client.get(
-            "/api/v1/operations/jobs/missing/configuration", headers=headers
+            "/api/v1/audit/jobs/missing/configuration", headers=headers
         ).status_code
         == 404
     )
+
+
+def test_audit_configuration_marks_a_stale_attempt(client, monkeypatch):
+    from backend.services import job_store
+
+    monkeypatch.setattr(settings, "audit_api_token", "audit-secret")
+    job_store.save_request(
+        "stale-task",
+        "job-token",
+        {"file": "a.pdf"},
+        {"task_id": "stale-task", "status": "processing"},
+    )
+    job_store.save_attempt_start(
+        "stale-task",
+        {"id": "attempt-a", "captured_at": "2026-11-27T10:00:00+00:00", "resumed": False},
+        {"schema": "acessilia/effective-configuration@2", "attempt": {"id": "attempt-a"}},
+    )
+    # A later attempt started but its snapshot write failed: the status
+    # carries the current id, while the latest snapshot is still A (#944).
+    job_store.save_status(
+        "stale-task",
+        {
+            "task_id": "stale-task",
+            "status": "processing",
+            "current_attempt_id": "attempt-b",
+            "current_attempt_captured_at": "2026-11-27T10:05:00+00:00",
+        },
+    )
+
+    response = client.get(
+        "/api/v1/audit/jobs/stale-task/configuration",
+        headers={"Authorization": "Bearer audit-secret"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["current"] is False
 
 
 def test_public_job_status_does_not_expose_the_effective_configuration(client):
@@ -362,8 +517,9 @@ def test_public_job_status_does_not_expose_the_effective_configuration(client):
         {"file": "a.pdf"},
         {"task_id": "private-config", "status": "processing"},
     )
-    job_store.save_configuration(
+    job_store.save_attempt_start(
         "private-config",
+        {"id": "private-attempt", "captured_at": "2026-11-27T10:00:00+00:00", "resumed": False},
         {"schema": "acessilia/effective-configuration@2", "environment": {"service": {"data_dir": "/internal"}}},
     )
 
@@ -376,12 +532,14 @@ def test_public_job_status_does_not_expose_the_effective_configuration(client):
     assert "configuracao_efetiva" not in record["status"]
 
 
-def test_job_configuration_declares_bearer_auth_in_openapi(client):
+def test_audit_configuration_declares_bearer_auth_in_openapi(client):
     schema = client.get("/openapi.json").json()
     assert schema["paths"][
-        "/api/v1/operations/jobs/{task_id}/configuration"
-    ]["get"]["security"] == [{"OperationsToken": []}]
-
+        "/api/v1/audit/jobs/{task_id}/configuration"
+    ]["get"]["security"] == [{"AuditToken": []}]
+    assert schema["paths"][
+        "/api/v1/audit/jobs/{task_id}/configuration/attempts"
+    ]["get"]["security"] == [{"AuditToken": []}]
 def test_observability_token_cannot_authorize_writes(monkeypatch):
     monkeypatch.setattr(settings, "observability_api_token", "secret")
     request = Request({"type": "http", "method": "POST"})
@@ -1066,6 +1224,87 @@ async def test_job_executor_keeps_original_filename_in_status(
     task = state_manager.obter(task_id)
     assert task is not None
     assert task["arquivo"] == "relatorio-final.pdf"
+
+
+
+
+@pytest.mark.asyncio
+async def test_a_terminal_status_failure_keeps_a_published_result(
+    tmp_path, monkeypatch, fake_pdf_ua_audit
+):
+    """A valid result is not deleted when the terminal status write fails."""
+    import sqlite3
+
+    from backend.agents.state_manager import state_manager
+    from backend.api import worker
+    from backend.api.worker import ApiJob, JobExecutor
+    from backend.services import job_store
+
+    task_id = "published-result"
+    input_path = tmp_path / "document.pdf"
+    input_path.write_bytes(_fake_pdf_bytes())
+    output_dir = tmp_path / "output" / task_id
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+    monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
+    job_store.save_request(
+        task_id,
+        "token",
+        {"file": str(input_path)},
+        {"task_id": task_id, "status": "queued"},
+    )
+
+    async def fake_process(*_args, **_kwargs):
+        state_manager.criar_tarefa(input_path, task_id=task_id)
+        return {"title": "Documento", "sections": []}
+
+    def write_file(_canonical, destination, _filename=None, **_kwargs):
+        destination.write_text("conteudo", encoding="utf-8")
+
+    async def write_mp3(_text, destination, _voice, **_kwargs):
+        destination.write_bytes(b"audio")
+
+    async def fake_token(*_args, **_kwargs):
+        return "tok"
+
+    async def ignore_history(*_args, **_kwargs):
+        return None
+
+    real_save_status = worker.save_status
+
+    def fail_on_done(task: str, status: dict) -> None:
+        if status.get("status") == "done":
+            raise sqlite3.OperationalError("disk full")
+        real_save_status(task, status)
+
+    monkeypatch.setattr("backend.service.process", fake_process)
+    for name in ("export_txt", "export_docx", "export_pdf_ua", "export_accessible_document"):
+        monkeypatch.setattr(f"backend.api.worker.{name}", write_file)
+    monkeypatch.setattr("backend.api.worker.export_mp3", write_mp3)
+    monkeypatch.setattr("backend.api.worker.criar_token", fake_token)
+    monkeypatch.setattr("backend.api.worker.finalizar_conversao", ignore_history)
+    monkeypatch.setattr(worker, "save_status", fail_on_done)
+
+    executor = JobExecutor()
+
+    async def run_inline(function, *args, **kwargs):
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(executor, "_run_in_executor", run_inline)
+    await executor.run(
+        ApiJob(
+            task_id=task_id,
+            file_path=input_path,
+            filename=input_path.name,
+            output_dir=output_dir,
+        )
+    )
+
+    assert state_manager.obter(task_id)["status"] == "done"
+    assert output_dir.exists()
+    attempts = job_store.load_attempts(task_id)
+    assert len(attempts) == 1
+    assert attempts[0]["state"] == "completed"
 
 
 # ``None`` leaves ``audio.docx`` in the output directory; the disabled case must

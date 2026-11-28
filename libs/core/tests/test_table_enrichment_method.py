@@ -450,6 +450,9 @@ def _ctx(enriched_state):
         def load(self, phase):
             return enriched_state
 
+        def accept(self, phase):
+            return None
+
         async def save(self, phase, build):
             saved[phase] = build()
 
