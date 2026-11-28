@@ -7,6 +7,7 @@ in the same transaction.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import pytest
@@ -168,3 +169,154 @@ def test_save_configuration_remains_a_compatibility_wrapper(tmp_path, monkeypatc
     latest = job_store.load_latest_attempt("attempt-job")
     assert latest["attempt_id"] == "compat"
     assert job_store.load_record("attempt-job")["configuration"] == latest["configuration"]
+
+def test_a_942_configuration_is_kept_as_a_legacy_attempt(tmp_path, monkeypatch) -> None:
+    """The snapshot that existed before #944 survives the next attempt."""
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    database = tmp_path / "history.db"
+    legacy_configuration = {
+        "schema": "acessilia/effective-configuration@2",
+        "attempt": {
+            "id": "legacy-a",
+            "captured_at": "2026-11-27T09:00:00+00:00",
+            "resumed": False,
+        },
+        "processing": {"run": {"mode": "normal"}},
+    }
+    with sqlite3.connect(database) as conn:
+        conn.execute(
+            "CREATE TABLE api_jobs (task_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, "
+            "request TEXT NOT NULL, status TEXT NOT NULL, configuration TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO api_jobs VALUES (?, ?, ?, ?, ?)",
+            (
+                "legacy-job",
+                "hash",
+                "{}",
+                '{"task_id": "legacy-job", "status": "processing"}',
+                None,  # overwritten below with valid JSON
+            ),
+        )
+        conn.execute(
+            "UPDATE api_jobs SET configuration=? WHERE task_id=?",
+            (json.dumps(legacy_configuration), "legacy-job"),
+        )
+
+    # Opening the database migrates it and copies the old snapshot.
+    assert job_store.load_record("legacy-job")["current_attempt_id"] == "legacy-a"
+    legacy = job_store.load_attempts("legacy-job")
+    assert len(legacy) == 1
+    assert legacy[0]["attempt_id"] == "legacy-a"
+    assert legacy[0]["state"] == "legacy"
+    assert legacy[0]["origin"] == "unknown"
+    assert legacy[0]["configuration"] == legacy_configuration
+
+    job_store.save_attempt_start(
+        "legacy-job",
+        _attempt("new-b", "2026-11-27T10:00:00+00:00", resumed=True),
+        _configuration("new-b"),
+    )
+
+    attempts = job_store.load_attempts("legacy-job")
+    assert [item["attempt_id"] for item in attempts] == ["legacy-a", "new-b"]
+    assert attempts[0]["configuration"] == legacy_configuration
+    assert job_store.load_record("legacy-job")["current_attempt_id"] == "new-b"
+
+
+def test_a_legacy_configuration_without_an_attempt_id_gets_a_stable_one(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    database = tmp_path / "history.db"
+    configuration = {"schema": "acessilia/effective-configuration@2", "processing": {}}
+    with sqlite3.connect(database) as conn:
+        conn.execute(
+            "CREATE TABLE api_jobs (task_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, "
+            "request TEXT NOT NULL, status TEXT NOT NULL, configuration TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO api_jobs VALUES (?, ?, ?, ?, ?)",
+            (
+                "no-id",
+                "hash",
+                "{}",
+                '{"task_id": "no-id", "status": "processing"}',
+                json.dumps(configuration),
+            ),
+        )
+
+    assert job_store.load_latest_attempt("no-id")["attempt_id"] == "legacy-no-id"
+
+def test_the_attempt_marker_reports_whether_it_was_persisted(
+    tmp_path, monkeypatch
+) -> None:
+    _job(tmp_path, monkeypatch)
+
+    assert job_store.save_attempt_marker(
+        "attempt-job", "attempt-a", "2026-11-27T10:00:00+00:00"
+    )
+    status = job_store.load_record("attempt-job")["status"]
+    assert status["current_attempt_id"] == "attempt-a"
+    assert status["current_attempt_captured_at"] == "2026-11-27T10:00:00+00:00"
+
+    assert not job_store.save_attempt_marker("missing", "attempt-a", "")
+
+    job_store.save_status(
+        "attempt-job",
+        {"task_id": "attempt-job", "status": "done"},
+    )
+    assert not job_store.save_attempt_marker(
+        "attempt-job", "attempt-b", "2026-11-27T10:05:00+00:00"
+    )
+
+
+def test_reconcile_closes_only_started_attempts(tmp_path, monkeypatch) -> None:
+    _job(tmp_path, monkeypatch)
+    job_store.save_attempt_start(
+        "attempt-job", _attempt("old", "2026-11-27T10:00:00+00:00"), _configuration("old")
+    )
+    job_store.save_attempt_start(
+        "attempt-job", _attempt("done", "2026-11-27T10:01:00+00:00"), _configuration("done")
+    )
+    job_store.save_attempt_result(
+        "attempt-job", "done", state="completed", origin="produced"
+    )
+
+    assert job_store.reconcile_started_attempts("attempt-job") == 1
+    attempts = job_store.load_attempts("attempt-job")
+    assert attempts[0]["state"] == "interrupted"
+    assert attempts[0]["origin"] == "unknown"
+    assert attempts[0]["error_type"] == "process-restart"
+    assert attempts[1]["state"] == "completed"
+    # Idempotent: a second recovery changes nothing.
+    assert job_store.reconcile_started_attempts("attempt-job") == 0
+
+
+def test_the_audit_view_reads_the_pointer_and_history_together(
+    tmp_path, monkeypatch
+) -> None:
+    _job(tmp_path, monkeypatch)
+    job_store.save_attempt_start(
+        "attempt-job", _attempt("a", "2026-11-27T10:00:00+00:00"), _configuration("a")
+    )
+
+    record, attempts = job_store.load_audit_view("attempt-job")
+
+    assert record["current_attempt_id"] == "a"
+    assert [item["attempt_id"] for item in attempts] == ["a"]
+    assert job_store.load_audit_view("missing") == (None, [])
+
+def test_the_attempt_marker_survives_later_status_writes(tmp_path, monkeypatch) -> None:
+    _job(tmp_path, monkeypatch)
+    assert job_store.save_attempt_marker(
+        "attempt-job", "attempt-a", "2026-11-27T10:00:00+00:00"
+    )
+
+    status = job_store.load_record("attempt-job")["status"]
+    status["etapa_atual"] = "still running"
+    job_store.save_status("attempt-job", status)
+
+    persisted = job_store.load_record("attempt-job")["status"]
+    assert persisted["current_attempt_id"] == "attempt-a"
+    assert persisted["current_attempt_captured_at"] == "2026-11-27T10:00:00+00:00"

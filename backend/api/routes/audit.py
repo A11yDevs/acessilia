@@ -17,7 +17,7 @@ from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import API_TASK_NOT_FOUND
 from backend.api.audit_auth import require_audit_token
 from backend.api.limiter import limiter
-from backend.services.job_store import load_attempts, load_latest_attempt, load_record
+from backend.services.job_store import load_audit_view
 
 router = APIRouter(tags=["audit"], dependencies=[Depends(require_audit_token)])
 
@@ -33,19 +33,19 @@ async def job_configuration(
     one, false when a later attempt started but its snapshot could not be
     written, and null for a legacy record written before attempts existed.
     """
-    record = await run_blocking(load_record, task_id)
+    record, attempts = await run_blocking(load_audit_view, task_id)
     if record is None:
         raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
-    latest = await run_blocking(load_latest_attempt, task_id)
+    latest = attempts[-1] if attempts else None
     if latest is None:
         configuration = record.get("configuration")
         if configuration is None:
             raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
         # A record from the version before per-attempt snapshots (#942).
         response.headers["Cache-Control"] = "no-store"
-        return {**configuration, "current": None}
+        return _legacy_response(configuration)
     response.headers["Cache-Control"] = "no-store"
-    return _attempt_response(record, latest)
+    return _attempt_response(record, latest, latest)
 
 
 @router.get("/audit/jobs/{task_id}/configuration/attempts")
@@ -54,12 +54,16 @@ async def job_attempts(
     request: Request, response: Response, task_id: str
 ) -> dict[str, Any]:
     """Every attempt of a job, oldest first, with its immutable configuration."""
-    record = await run_blocking(load_record, task_id)
+    record, attempts = await run_blocking(load_audit_view, task_id)
     if record is None:
         raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
-    attempts = await run_blocking(load_attempts, task_id)
     latest = attempts[-1] if attempts else None
     response.headers["Cache-Control"] = "no-store"
+    if latest is None:
+        return {
+            "current_attempt_id": _current_attempt_id(record, None),
+            "attempts": [],
+        }
     return {
         "current_attempt_id": _current_attempt_id(record, latest),
         "attempts": [
@@ -71,7 +75,7 @@ async def job_attempts(
 def _attempt_response(
     record: dict[str, Any],
     attempt: dict[str, Any],
-    latest: dict[str, Any] | None = None,
+    latest: dict[str, Any],
 ) -> dict[str, Any]:
     """The stored configuration with the attempt's result merged in for reading.
 
@@ -94,12 +98,25 @@ def _attempt_response(
     provenance = dict(configuration.get("provenance") or {})
     provenance["result_origin"] = attempt["origin"]
     provenance["reused_phases"] = attempt["reused_phases"]
-    if attempt["producer"] is not None:
-        provenance["producer"] = attempt["producer"]
     configuration["provenance"] = provenance
-    current = _current_attempt_id(record, latest or attempt)
+    current = _current_attempt_id(record, latest)
     configuration["current"] = None if current is None else current == attempt["attempt_id"]
     return configuration
+
+
+def _legacy_response(configuration: dict[str, Any]) -> dict[str, Any]:
+    """A #942 record, filled with the documented fields that did not exist yet."""
+    response = dict(configuration)
+    attempt = dict(response.get("attempt") or {})
+    attempt.setdefault("state", None)
+    attempt.setdefault("finished_at", None)
+    response["attempt"] = attempt
+    provenance = dict(response.get("provenance") or {})
+    provenance.setdefault("result_origin", "unknown")
+    provenance.setdefault("reused_phases", [])
+    response["provenance"] = provenance
+    response["current"] = None
+    return response
 
 
 def _current_attempt_id(

@@ -157,6 +157,48 @@ def test_a_resumed_run_records_the_resumed_origin_and_phases(monkeypatch, tmp_pa
     assert outcome.reused_phases == ["manifest"]
 
 
+def test_a_cache_reconstruction_failure_leaves_the_origin_unknown(
+    monkeypatch, tmp_path
+):
+    from acessilia_core.ports import RunOutcome
+    from backend import service
+
+    document = tmp_path / "cache-failure.png"
+    document.write_bytes(b"cached image")
+
+    async def cached(*_args, **_kwargs):
+        return {"canonical_metadata": {}}
+
+    async def noop(*_args, **_kwargs):
+        return None
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("canonical build failed")
+
+    monkeypatch.setattr(service, "get_cached", cached)
+    monkeypatch.setattr(service, "registrar_conversao", noop)
+    monkeypatch.setattr(service, "finalizar_conversao", noop)
+    monkeypatch.setattr(service, "build_canonical_document", broken)
+    monkeypatch.setattr(service.state_manager, "criar_tarefa", lambda *_args, **_kwargs: "task")
+    monkeypatch.setattr(service.state_manager, "atualizar", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(service.state_manager, "verificar_cancelamento", lambda *_args: None)
+    monkeypatch.setattr(service.state_manager, "errar", lambda *_args, **_kwargs: "error")
+    outcome = RunOutcome()
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(
+            service.process(
+                document,
+                task_id="cache-failure",
+                config=core_config(),
+                outcome=outcome,
+            )
+        )
+
+    assert outcome.result_origin == "unknown"
+    assert outcome.reused_phases == []
+
+
 def test_cache_key_sha256_full_hash_and_file_size(tmp_path):
     from backend.services.cache import _cache_key
 

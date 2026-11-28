@@ -69,8 +69,7 @@ SCHEMA = "acessilia/effective-configuration@2"
 PROVENANCE_NOTE: str = (
     "The configuration snapshot describes what this attempt resolved. It is "
     "not the provenance of a result reused from the processing cache or a "
-    "checkpoint; the attempt result records the origin, the reused phases and "
-    "the producer when it is identifiable."
+    "checkpoint; the attempt result records the origin and the reused phases."
 )
 
 #: ``CoreConfig`` fields left out of the processing identity that describe

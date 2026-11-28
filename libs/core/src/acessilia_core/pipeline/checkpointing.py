@@ -129,9 +129,17 @@ class RunCheckpoints:
                 self._checkpoints.job_id, phase, ", ".join(changed),
             )
             return None
+        return payload
+
+    def accept(self, phase: str) -> None:
+        """Record that the caller adopted the checkpoint of ``phase`` (#944).
+
+        ``load`` only returns the payload: a phase can still be discarded by
+        the caller's content checks (an execution checkpoint from another
+        plan, for example). Only an accepted phase is provenance.
+        """
         if self._outcome is not None:
             self._outcome.mark_reused(phase)
-        return payload
 
     def _stamp(self, payload: dict[str, Any], stages: Iterable[str]) -> dict[str, Any]:
         payload[IDENTITY_KEY] = {stage: self._identity[stage] for stage in stages}

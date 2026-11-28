@@ -11,7 +11,7 @@
       "complexity": 38
     },
     "backend/api/worker.py::recover_pending_jobs": {
-      "lines": 104,
+      "lines": 101,
       "complexity": 19
     },
     "backend/service.py::process": {

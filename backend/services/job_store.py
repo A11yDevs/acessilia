@@ -81,7 +81,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         "CREATE TABLE IF NOT EXISTS job_attempts ("
         "task_id TEXT NOT NULL, attempt_id TEXT NOT NULL, captured_at TEXT NOT NULL, "
         "resumed INTEGER NOT NULL, state TEXT NOT NULL, origin TEXT NOT NULL, "
-        "configuration TEXT NOT NULL, reused_phases TEXT NOT NULL, producer TEXT, "
+        "configuration TEXT NOT NULL, reused_phases TEXT NOT NULL, "
         "error_type TEXT, created_at REAL NOT NULL, finished_at REAL, "
         "PRIMARY KEY (task_id, attempt_id))"
     )
@@ -109,7 +109,55 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
                 # the ALTER; that is the same end state, not a failure.
                 if "duplicate column" not in str(exc).lower():
                     raise
+        _migrate_legacy_configurations(conn)
         _migrated.add(key)
+
+
+def _migrate_legacy_configurations(conn: sqlite3.Connection) -> None:
+    """Keep the #942 configuration as the first attempt of its job (#944).
+
+    ``api_jobs.configuration`` is the latest snapshot; before this migration it
+    was the only one. A job with a configuration and no attempt row gets a
+    ``legacy`` attempt so a later snapshot does not make the previous
+    configuration disappear. The original JSON is kept verbatim, and the state
+    does not invent a terminal result or a completion time.
+    """
+    rows = conn.execute(
+        "SELECT task_id, configuration FROM api_jobs "
+        "WHERE configuration IS NOT NULL AND NOT EXISTS "
+        "(SELECT 1 FROM job_attempts a WHERE a.task_id = api_jobs.task_id)"
+    ).fetchall()
+    for row in rows:
+        try:
+            configuration = json.loads(row["configuration"])
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(configuration, dict):
+            continue
+        attempt = configuration.get("attempt")
+        if not isinstance(attempt, dict):
+            attempt = {}
+        attempt_id = str(attempt.get("id") or f"legacy-{row['task_id']}")
+        captured_at = str(attempt.get("captured_at") or "")
+        resumed = bool(attempt.get("resumed", False))
+        conn.execute(
+            "INSERT OR IGNORE INTO job_attempts "
+            "(task_id, attempt_id, captured_at, resumed, state, origin, "
+            "configuration, reused_phases, error_type, created_at, finished_at) "
+            "VALUES (?, ?, ?, ?, 'legacy', 'unknown', ?, '[]', NULL, 0, NULL)",
+            (
+                row["task_id"],
+                attempt_id,
+                captured_at,
+                int(resumed),
+                row["configuration"],
+            ),
+        )
+        conn.execute(
+            "UPDATE api_jobs SET current_attempt_id=? "
+            "WHERE task_id=? AND current_attempt_id IS NULL",
+            (attempt_id, row["task_id"]),
+        )
 
 
 def save_request(task_id: str, token: str, request: dict, status: dict) -> None:
@@ -122,7 +170,7 @@ def save_request(task_id: str, token: str, request: dict, status: dict) -> None:
 
 #: Valid attempt states, from the start to a terminal result (#944).
 ATTEMPT_STATES: frozenset[str] = frozenset(
-    {"started", "completed", "failed", "cancelled", "interrupted"}
+    {"started", "completed", "failed", "cancelled", "interrupted", "legacy"}
 )
 
 #: Valid result origins. ``unknown`` is evidence-free, never a guess (#944).
@@ -151,8 +199,8 @@ def save_attempt_start(
         conn.execute(
             "INSERT INTO job_attempts "
             "(task_id, attempt_id, captured_at, resumed, state, origin, "
-            "configuration, reused_phases, producer, error_type, created_at, finished_at) "
-            "VALUES (?, ?, ?, ?, 'started', 'unknown', ?, '[]', NULL, NULL, ?, NULL)",
+            "configuration, reused_phases, error_type, created_at, finished_at) "
+            "VALUES (?, ?, ?, ?, 'started', 'unknown', ?, '[]', NULL, ?, NULL)",
             (task_id, attempt_id, captured_at, int(resumed), encoded, time.time()),
         )
         updated = conn.execute(
@@ -185,6 +233,47 @@ def save_configuration(task_id: str, configuration: dict[str, Any]) -> None:
     )
 
 
+def save_attempt_marker(
+    task_id: str, attempt_id: str, captured_at: str
+) -> bool:
+    """Write the current-attempt marker into the durable status (#944).
+
+    A dedicated operation instead of ``save_status``: it detects a job row
+    that does not exist or a terminal status that refuses the update, so the
+    caller does not treat an ignored write as a persisted marker. Returns
+    whether a row was updated.
+    """
+    with connection() as conn:
+        updated = conn.execute(
+            "UPDATE api_jobs SET status = json_set("
+            "status, '$.current_attempt_id', ?, "
+            "'$.current_attempt_captured_at', ?) "
+            "WHERE task_id=? AND json_extract(status, '$.status') "
+            "IN ('queued', 'processing')",
+            (attempt_id, captured_at, task_id),
+        ).rowcount
+    return updated > 0
+
+
+def reconcile_started_attempts(
+    task_id: str, *, error_type: str = "process-restart"
+) -> int:
+    """Close attempts a dead process left ``started`` (#944).
+
+    Called by the recovery of a job whose owner is provably gone. Terminal
+    attempts are never touched, the configuration stays immutable and the
+    origin stays ``unknown``. ``finished_at`` is the reconciliation time, not
+    the crash time; ``error_type`` records that distinction.
+    """
+    with connection() as conn:
+        return conn.execute(
+            "UPDATE job_attempts SET state='interrupted', origin='unknown', "
+            "error_type=?, finished_at=? "
+            "WHERE task_id=? AND state='started'",
+            (error_type, time.time(), task_id),
+        ).rowcount
+
+
 def save_attempt_result(
     task_id: str,
     attempt_id: str,
@@ -192,7 +281,6 @@ def save_attempt_result(
     state: str,
     origin: str,
     reused_phases: list[str] | None = None,
-    producer: dict[str, Any] | None = None,
     error_type: str | None = None,
 ) -> None:
     """Fill an attempt's result once, without touching its configuration (#944).
@@ -200,22 +288,19 @@ def save_attempt_result(
     ``state`` and ``origin`` are validated; ``error_type`` is the exception
     class name, never its message, so no user content reaches the audit.
     """
-    if state not in ATTEMPT_STATES or state == "started":
+    if state not in ATTEMPT_STATES or state in {"started", "legacy"}:
         raise ValueError(f"invalid terminal attempt state: {state!r}")
     if origin not in ATTEMPT_ORIGINS:
         raise ValueError(f"invalid attempt origin: {origin!r}")
     with connection() as conn:
         updated = conn.execute(
             "UPDATE job_attempts SET state=?, origin=?, reused_phases=?, "
-            "producer=?, error_type=?, finished_at=? "
+            "error_type=?, finished_at=? "
             "WHERE task_id=? AND attempt_id=? AND state='started'",
             (
                 state,
                 origin,
                 json.dumps(list(dict.fromkeys(reused_phases or [])), ensure_ascii=False),
-                json.dumps(producer, ensure_ascii=False, sort_keys=True)
-                if producer is not None
-                else None,
                 error_type,
                 time.time(),
                 task_id,
@@ -257,7 +342,6 @@ def _attempt_record(row: sqlite3.Row) -> dict[str, Any]:
         "origin": row["origin"],
         "configuration": json.loads(row["configuration"]),
         "reused_phases": json.loads(row["reused_phases"]),
-        "producer": json.loads(row["producer"]) if row["producer"] else None,
         "error_type": row["error_type"],
         "created_at": row["created_at"],
         "finished_at": row["finished_at"],
@@ -269,8 +353,35 @@ def load_record(task_id: str) -> dict[str, Any] | None:
         row = conn.execute(
             "SELECT * FROM api_jobs WHERE task_id=?", (task_id,)
         ).fetchone()
+    return _record_from_row(row) if row is not None else None
+
+
+def load_audit_view(
+    task_id: str,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    """The job record and its attempts from one SQLite read snapshot (#946).
+
+    The route reads the current pointer and the history together, so a new
+    attempt persisted between two independent reads cannot produce a pointer
+    from one state and a history from another. ``BEGIN`` makes both SELECTs
+    share the read transaction; SQLite readers see a stable snapshot until it
+    ends.
+    """
+    with connection() as conn:
+        conn.execute("BEGIN")
+        row = conn.execute(
+            "SELECT * FROM api_jobs WHERE task_id=?", (task_id,)
+        ).fetchone()
+        attempts = conn.execute(
+            "SELECT * FROM job_attempts WHERE task_id=? ORDER BY created_at, rowid",
+            (task_id,),
+        ).fetchall()
     if row is None:
-        return None
+        return None, []
+    return _record_from_row(row), [_attempt_record(item) for item in attempts]
+
+
+def _record_from_row(row: sqlite3.Row) -> dict[str, Any]:
     configuration = row["configuration"]
     return {
         "task_id": row["task_id"],

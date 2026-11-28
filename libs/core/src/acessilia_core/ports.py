@@ -164,13 +164,11 @@ class RunOutcome:
     Mutable and per run: the core records a phase when a checkpoint is reused,
     and the service reads the object after ``execute`` to store the attempt's
     result. ``unknown`` until evidence exists; a caller never infers an origin
-    without it. ``producer`` carries the original attempt when the service can
-    identify it (a cache hit or a resumed checkpoint may not).
+    without it.
     """
 
     result_origin: Literal["produced", "cache", "resumed", "unknown"] = "unknown"
     reused_phases: list[str] = field(default_factory=list)
-    producer: dict[str, Any] | None = None
 
     def mark_reused(self, phase: str) -> None:
         """Record that ``phase`` came from a checkpoint of this job."""

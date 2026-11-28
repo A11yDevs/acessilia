@@ -79,6 +79,8 @@ from backend.services.history_service import finalizar_conversao, registrar_conv
 from backend.services.job_store import (
     load_record,
     pending_records,
+    reconcile_started_attempts,
+    save_attempt_marker,
     save_attempt_result,
     save_attempt_start,
     save_status,
@@ -419,6 +421,26 @@ class JobExecutor:
             "captured_at": datetime.now(UTC).isoformat(),
             "resumed": resumed,
         }
+        # The marker exists before the builder can fail: a known attempt
+        # without a snapshot must not leave the previous one looking current.
+        state_manager.definir_tentativa(
+            task_id, str(attempt["id"]), str(attempt["captured_at"])
+        )
+        try:
+            marked = await run_blocking(
+                save_attempt_marker,
+                task_id,
+                str(attempt["id"]),
+                str(attempt["captured_at"]),
+            )
+            if not marked:
+                logger.warning("Job {}: attempt marker was not persisted", task_id)
+        except Exception as exc:  # noqa: BLE001 - the marker is best-effort
+            logger.warning(
+                "Job {}: attempt marker not persisted: {}",
+                task_id,
+                type(exc).__name__,
+            )
         run = {
             "mode": job.mode,
             "custom_prompt": job.custom_prompt,
@@ -440,17 +462,6 @@ class JobExecutor:
                 type(exc).__name__,
             )
             return None
-        state_manager.definir_tentativa(
-            task_id, str(attempt["id"]), str(attempt["captured_at"])
-        )
-        try:
-            await run_blocking(save_status, task_id, get_job_status(task_id))
-        except Exception as exc:  # noqa: BLE001 - the marker is best-effort
-            logger.warning(
-                "Job {}: attempt marker not persisted: {}",
-                task_id,
-                type(exc).__name__,
-            )
         try:
             await run_blocking(
                 save_attempt_start, task_id, attempt, configuration
@@ -484,7 +495,6 @@ class JobExecutor:
                 state=state,
                 origin=outcome.result_origin,
                 reused_phases=outcome.reused_phases,
-                producer=outcome.producer,
                 error_type=error_type,
             )
         except Exception as exc:  # noqa: BLE001 - the audit result is best-effort
@@ -751,11 +761,11 @@ class JobExecutor:
                 status="done", resultado=json.dumps(canonical, ensure_ascii=False),
                 email_delivery="pending" if job.email else None,
             )
-            await run_blocking(save_status, task_id, get_job_status(task_id))
+            result_published = True
             await self._finish_attempt(
                 task_id, attempt_id, state="completed", outcome=outcome
             )
-            result_published = True
+            await run_blocking(save_status, task_id, get_job_status(task_id))
             await finalizar_conversao(
                 task_id=task_id,
                 status="done",
@@ -941,6 +951,16 @@ def expirar_status_fila(max_age_seconds: int, now: float | None = None) -> int:
     return len(expired)
 
 
+async def _recover_cancelling(task_id: str, record: dict[str, Any], status: dict[str, Any]) -> None:
+    """Finish a cancel interrupted by a restart, closing abandoned attempts."""
+    await run_blocking(reconcile_started_attempts, task_id)
+    status.update(status="cancelled", fim=time.time(), etapa_atual=t(STAGE_RESTART_CANCELLED))
+    await run_blocking(save_status, task_id, status)
+    Path(record["request"]["file_path"]).unlink(missing_ok=True)
+    await run_blocking(job_checkpoint.clear, task_id)
+    await finalizar_conversao(task_id, status="cancelled")
+
+
 async def recover_pending_jobs() -> None:
     from backend.api.routes.jobs import job_executor
     from backend.services.queue_service import QueueItem, unified_queue
@@ -948,11 +968,7 @@ async def recover_pending_jobs() -> None:
         task_id = record["task_id"]
         status = record["status"]
         if status["status"] == "cancelling":
-            status.update(status="cancelled", fim=time.time(), etapa_atual=t(STAGE_RESTART_CANCELLED))
-            await run_blocking(save_status, task_id, status)
-            Path(record["request"]["file_path"]).unlink(missing_ok=True)
-            await run_blocking(job_checkpoint.clear, task_id)
-            await finalizar_conversao(task_id, status="cancelled")
+            await _recover_cancelling(task_id, record, status)
             continue
         if status["status"] == "processing":
             # A job that wrote a pipeline checkpoint continues where it stopped;
@@ -969,6 +985,7 @@ async def recover_pending_jobs() -> None:
                 # A previous recovery already put this job back in the queue:
                 # leave its processing status and checkpoints untouched.
                 continue
+            await run_blocking(reconcile_started_attempts, task_id)
             if (
                 settings.job_resume_on_restart
                 and job is not None

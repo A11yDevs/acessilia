@@ -663,6 +663,14 @@ class Settings:
                 f"QUEUE_MAX_CONCURRENT must be positive, got {self.queue_max_concurrent}"
             )
         self.validate_queue_concurrency()
+        if self.audit_api_token and self.audit_api_token == self.operations_api_token:
+            raise ValueError(
+                "AUDIT_API_TOKEN must differ from OPERATIONS_API_TOKEN"
+            )
+        if self.audit_api_token and self.audit_api_token == self.observability_api_token:
+            raise ValueError(
+                "AUDIT_API_TOKEN must differ from OBSERVABILITY_API_TOKEN"
+            )
         if self.model_call_workers < 1:
             raise ValueError(
                 f"MODEL_CALL_WORKERS must be positive, got {self.model_call_workers}"

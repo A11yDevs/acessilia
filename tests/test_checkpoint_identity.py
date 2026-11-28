@@ -30,6 +30,7 @@ from acessilia_core.pipeline.handlers import (
 )
 from acessilia_core.ports import (
     CHECKPOINT_PHASES,
+    PHASE_EXECUTION,
     PHASE_MANIFEST,
     NoRegionCache,
     RunOutcome,
@@ -474,8 +475,11 @@ def test_a_reused_checkpoint_is_recorded_in_the_run_outcome() -> None:
     reader = RunCheckpoints(store, config, outcome=outcome)
 
     assert reader.load(PHASE_MANIFEST) is not None
+    assert outcome.reused_phases == []
+    reader.accept(PHASE_MANIFEST)
     assert outcome.reused_phases == [PHASE_MANIFEST]
     assert reader.load(PHASE_MANIFEST) is not None
+    reader.accept(PHASE_MANIFEST)
     assert outcome.reused_phases == [PHASE_MANIFEST]
     assert outcome.result_origin == "unknown"
 
@@ -491,3 +495,50 @@ def test_a_rejected_checkpoint_is_not_recorded_as_reused() -> None:
 
     assert RunCheckpoints(store, config, outcome=outcome).load(PHASE_MANIFEST) is None
     assert outcome.reused_phases == []
+
+
+def test_a_legacy_checkpoint_is_accepted_only_when_the_caller_uses_it() -> None:
+    config = core_config()
+    store = MemoryCheckpoints("job-outcome-legacy")
+    store.phases[PHASE_MANIFEST] = {"manifest": {}}
+    outcome = RunOutcome()
+
+    reader = RunCheckpoints(store, config, outcome=outcome)
+
+    assert reader.load(PHASE_MANIFEST) == {"manifest": {}}
+    assert outcome.reused_phases == []
+    reader.accept(PHASE_MANIFEST)
+    assert outcome.reused_phases == [PHASE_MANIFEST]
+
+
+def test_an_execution_checkpoint_from_another_plan_is_not_reused() -> None:
+    config = core_config()
+    store = MemoryCheckpoints("job-execution")
+    writer = RunCheckpoints(store, config)
+    store.phases[PHASE_EXECUTION] = writer._stamp(
+        {"plan_id": "another-plan", "manifest": {}, "results": []},
+        PHASE_STAGES[PHASE_EXECUTION],
+    )
+    outcome = RunOutcome()
+    reader = RunCheckpoints(store, config, outcome=outcome)
+    plan = SimpleNamespace(plan_id="current-plan")
+
+    assert pddl.PddlAccessibilityOrchestrator._load_execution_state(reader, plan) is None
+    assert outcome.reused_phases == []
+
+
+def test_a_matching_execution_checkpoint_is_reused() -> None:
+    config = core_config()
+    store = MemoryCheckpoints("job-execution-match")
+    writer = RunCheckpoints(store, config)
+    payload = writer._stamp(
+        {"plan_id": "current-plan", "manifest": {}, "results": []},
+        PHASE_STAGES[PHASE_EXECUTION],
+    )
+    store.phases[PHASE_EXECUTION] = payload
+    outcome = RunOutcome()
+    reader = RunCheckpoints(store, config, outcome=outcome)
+    plan = SimpleNamespace(plan_id="current-plan")
+
+    assert pddl.PddlAccessibilityOrchestrator._load_execution_state(reader, plan) == payload
+    assert outcome.reused_phases == [PHASE_EXECUTION]

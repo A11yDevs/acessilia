@@ -436,6 +436,7 @@ class PddlAccessibilityOrchestrator:
         """
         media_state = ctx.checkpoints.load(PHASE_MEDIA)
         if media_state is not None:
+            ctx.checkpoints.accept(PHASE_MEDIA)
             ctx.ports.services.media_inspection = media_state.get("inspection")
             return media_state.get("inspection"), dict(media_state.get("configuration") or {})
         # media.inspect runs first: a slide deck is extracted and structured
@@ -472,6 +473,8 @@ class PddlAccessibilityOrchestrator:
         _check_page_limit(manifest, ctx.config.document)
         manifest.extractor.configuration["region_inspection_mode"] = ctx.effective_mode
         manifest.extractor.configuration.update(media_configuration)
+        if resumed_manifest:
+            ctx.checkpoints.accept(PHASE_MANIFEST)
         if not resumed_manifest:
             # Saved after the page limit and the media configuration: an
             # oversized document must not leave a checkpoint to resume from.
@@ -493,6 +496,7 @@ class PddlAccessibilityOrchestrator:
             # configuration is re-applied so a changed default is still visible.
             manifest.extractor.configuration["region_inspection_mode"] = ctx.effective_mode
             manifest.extractor.configuration.update(media_configuration)
+            ctx.checkpoints.accept(PHASE_ENRICHED)
             return manifest
         await self._enrich_before_planning(manifest, media_inspection, ctx.checkpoints)
         # The formula regions (#640, M4a), the pictures (M1), the formula
@@ -521,7 +525,7 @@ class PddlAccessibilityOrchestrator:
                     availability.mode,
                     current,
                 )
-            return _PlanningState(
+            planning = _PlanningState(
                 plan=NominalPlan.model_validate(plan_state["plan"]),
                 comparison=(
                     PlanningComparison.model_validate(plan_state["comparison"])
@@ -536,6 +540,8 @@ class PddlAccessibilityOrchestrator:
                 previous_signature=plan_state.get("previous_signature"),
                 admission_deferred_ids=restored_admission_deferred_ids(plan_state),
             )
+            ctx.checkpoints.accept(PHASE_PLAN)
+            return planning
         if ctx.status_callback:
             await ctx.status_callback(t(STAGE_GENERATING_PDDL_PLAN))
         # One catalogue snapshot per document, so the first plan and every
@@ -568,6 +574,8 @@ class PddlAccessibilityOrchestrator:
             # was written (a replan that crashed before it started). The old
             # progress does not apply to the new plan.
             return None
+        if execution_state is not None:
+            checkpoints.accept(PHASE_EXECUTION)
         return execution_state
 
     async def _run_plan(

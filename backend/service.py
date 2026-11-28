@@ -319,9 +319,7 @@ async def process(
         )
         cached = _usable_cache(await get_cached(file_path, cache_variant), service_settings)
         if cached is not None:
-            run_outcome.result_origin = "cache"
-            run_outcome.reused_phases.clear()
-            return await _serve_cached(
+            canonical_document = await _serve_cached(
                 cached,
                 file_path=file_path,
                 config=config,
@@ -333,6 +331,9 @@ async def process(
                 service_settings=service_settings,
                 inicio=inicio,
             )
+            run_outcome.result_origin = "cache"
+            run_outcome.reused_phases.clear()
+            return canonical_document
 
         if not resumed:
             state_manager.atualizar(
@@ -377,11 +378,6 @@ async def process(
             if not shutdown.shutting_down():
                 operation_registry.clear(task_id)
 
-        if run_outcome.result_origin == "unknown":
-            run_outcome.result_origin = (
-                "resumed" if resumed and run_outcome.reused_phases else "produced"
-            )
-
         canonical_metadata: dict[str, Any] | None = None
         technical_warnings: list[str] | None = None
         if isinstance(resultado, dict):
@@ -419,6 +415,10 @@ async def process(
             metadata=canonical_metadata,
             technical_warnings=technical_warnings,
         )
+        if run_outcome.result_origin == "unknown":
+            run_outcome.result_origin = (
+                "resumed" if resumed and run_outcome.reused_phases else "produced"
+            )
 
         await _store_processed_result(processed_result, file_path, cache_variant)
         _salvar_json_canonico(canonical_document, file_path.name)
