@@ -438,3 +438,18 @@ def test_the_planning_stage_holds_what_the_gate_reads() -> None:
     """The gate resolves the dual fusion's secondary provider (review of #578)."""
     assert "fusion.secondary_provider" in STAGE_FIELDS["planning"]
     assert "toolbox.availability_gate" in STAGE_FIELDS["planning"]
+
+
+def test_normalizer_upgrade_changes_cache_key_and_invalidates_all_stamped_phases():
+    from backend.service import _cache_version
+
+    config = core_config()
+    old_providers = dict(config.toolbox.providers)
+    old_providers.pop("toolbox_text_normalize_provider")
+    previous = replace(config, toolbox=replace(config.toolbox, providers=old_providers))
+    assert _cache_version(previous) != _cache_version(config)
+    store = MemoryCheckpoints("normalization-upgrade")
+    for phase, stages in PHASE_STAGES.items():
+        store.phases[phase] = {IDENTITY_KEY: {stage: stage_identity(previous, stage) for stage in stages}}
+    resumed = RunCheckpoints(store, config)
+    assert all(resumed.load(phase) is None for phase in CHECKPOINT_PHASES)

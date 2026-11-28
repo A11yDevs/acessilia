@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:a11y-devs:schema:text-normalization-result:1.0.0",
+  "$defs": {
+    "NormalizationObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "maxLength": 1048576,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Text"
+        },
+        "input_fingerprint": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Input Fingerprint",
+          "type": "string"
+        },
+        "processed": {
+          "title": "Processed",
+          "type": "boolean"
+        },
+        "changed": {
+          "title": "Changed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "input_fingerprint",
+        "processed",
+        "changed"
+      ],
+      "title": "NormalizationObservation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "results": {
+      "items": {
+        "$ref": "#/$defs/NormalizationObservation"
+      },
+      "maxItems": 256,
+      "title": "Results",
+      "type": "array"
+    },
+    "processed_count": {
+      "maximum": 256,
+      "minimum": 0,
+      "title": "Processed Count",
+      "type": "integer"
+    },
+    "changed_count": {
+      "maximum": 256,
+      "minimum": 0,
+      "title": "Changed Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "results",
+    "processed_count",
+    "changed_count"
+  ],
+  "title": "NormalizationResult",
+  "type": "object"
+}

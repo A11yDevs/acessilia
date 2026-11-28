@@ -1,8 +1,8 @@
 {
   "repository": "A11yDevs/acessilia-toolbox",
-  "commit": "c536c2007912e0ce2f20bd930215d96e6f4c09be",
+  "commit": "b1ac9178c15e394860d4ee1adb9cc694a4602db3",
   "sha256": {
-    "toolbox-contract.json": "6881718f9446b07393af4fdb681fcf42a96dfdc8938bc367874d077e38ff447c",
+    "toolbox-contract.json": "873cf3fd78b6021140bee110f15953297b19bc4a26f7f02c76ceedc724114008",
     "toolbox-schemas/dataset-artifact@1.json": "3fa307b48f9624d178f1545ed4852534afcb7f4d918ed07daebff673dd580fc7",
     "toolbox-schemas/dataset-info@1.json": "975142318878caf680f3aee366d7d646afe071a9837af2a384af9ed608e17691",
     "toolbox-schemas/dataset-item-list@1.json": "035d534c94f5cfb77fbb68936be6d6a79a2ab52dd86f47ea41582b9d6932198c",
@@ -25,6 +25,8 @@
     "toolbox-schemas/reference@1.json": "e580aa0cd2740e37a2ea925971e775586e4920c9e4a47e81449f63540fbb64fa",
     "toolbox-schemas/region-transcription@1.json": "7b3af8cb0e0fba4188eeca13881a0faa19541d5550b6aad648abdb8be3046f56",
     "toolbox-schemas/structured-document@1.json": "dfc63d45f44c50d2b34f3af6d79c8fa225d88364df8e291fb2f905280da0b472",
+    "toolbox-schemas/text-normalization-request@1.json": "89edd6460fb8984bd731938f20a45a590d54e1b8f6381dbdff2d6da05dc7034a",
+    "toolbox-schemas/text-normalization-result@1.json": "d0bba8397e32a6737422a0d9034919397db981426ea16d850ddbeef0ec456c48",
     "toolbox-schemas/text-spans@1.json": "3113fdedef4fbcabc5d0b25531818e1ed28448c0938dabc00282c4e90b09dd97",
     "toolbox-schemas/verbalized@1.json": "8be5678feea86744a1426dfca2b9b02d72a399cab719cc10cb4dee92862ac2f5"
   }

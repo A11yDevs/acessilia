@@ -42,6 +42,7 @@ KNOWN_DRIFT: frozenset[str] = frozenset()
 EXPECTED_UNCONSUMED = frozenset(
     {
         "accessibility.mark",
+        "audio.synthesize",
         "chem.convert",
         "chem.recognize",
         "code.normalize",

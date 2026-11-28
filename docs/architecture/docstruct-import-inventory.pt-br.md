@@ -223,7 +223,7 @@ Os importadores se agrupam pela parte do Core que executa a computação. Esta
 | `docstruct.text.math_spans` | algoritmo | `block_prose`, `inline_math_sources` | `pipeline/handlers/formula` |
 | `docstruct.text.named_operators` | algoritmo | `normalize_named_operators`, `speak_named_operators` | `pipeline/handlers/formula` |
 | `docstruct.text.negation_overlay` | algoritmo | `compose_in_grid`, `compose_in_text`, `is_detached_overlay` | `pipeline/enrichment/inline_math`, `pipeline/handlers/unicode_repair` |
-| `docstruct.text.norm_fix` | algoritmo | `norm_fix` | `agents/fusion_agent`, `manifest/detectors/text`, `pipeline/handlers/text` |
+| `docstruct.text.norm_fix` | algoritmo | `norm_fix` | `agents/fusion_agent`, `manifest/detectors/text`; execução do handler migrada para a Toolbox (#929) |
 | `docstruct.text.paragraphs` | algoritmo | `merge_broken_paragraphs` | `backend/service` |
 | `docstruct.text.unicode_repair` | algoritmo | `Detection`, `UnicodeRepairContext`, `detect_legacy_unicode`, `repair_legacy_unicode` | `manifest/detectors/text`, `pipeline/handlers/unicode_repair` |
 | `docstruct.types` | algoritmo | `Region` | `agents/fusion_agent` |

@@ -48,7 +48,8 @@ Each module's `__all__` is the SDK's public API ([ADR-0018](../../docs/adr/0018-
 | `acessilia_sdk.toolbox.transport` | `execute_capability` — the only path to `POST /v1/capabilities/{id}:execute`; `require_capability`, `raise_for_error`, `auth_headers`, `media_type_for` |
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base for per-capability clients (connections, Bearer header, provider, failover, `health`, `close`); `FailoverHook` |
 | `acessilia_sdk.toolbox.config` | `ToolboxClientConfig`, `make_client` — every client setting as an explicit value (endpoints, API key, timeouts, retries, providers by `provider_key`, export timeouts by `timeout_key`, failover hook), and the factory that builds a client from it |
-| `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOperationClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxPdfValidateClient`, `ToolboxStructureClient`, `ToolboxTableClient` — one client per capability family; no settings, no logging; `client_timeout_keys` lists the clients' own timeout settings for a caller building a ToolboxClientConfig |
+| `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOperationClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxPdfValidateClient`, `ToolboxStructureClient`, `ToolboxTableClient`, `ToolboxTextNormalizeClient` — one client per capability family; no settings, no logging; `client_timeout_keys` lists the clients' own timeout settings for a caller building a ToolboxClientConfig |
+| `acessilia_sdk.toolbox.text_normalization` | `TextTarget`, `TextObservation`, `NormalizationBatch`, `NormalizedBatch`, `NormalizationProvenance`, `normalization_batches`, `read_normalization`, `target_fingerprint`, `canonical_json`, `fingerprint`, `CAPABILITY`, `PROVIDER_VERSION`, `DOCSTRUCT_VERSION`, `MAX_TARGETS`, `MAX_PAYLOAD_BYTES` — immutable DTOs, bounded original request batches, protocol fingerprints and strict observation/provenance validation |
 | `acessilia_sdk.toolbox.clients.adjudicate` | `page_judgement_probability` — the `pB` of a `document.adjudicate.page` answer, or `None` when it is missing or outside [0, 1] |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — the Toolbox instances a client tries, in order |
 | `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (the PNG of `ToolboxPdfClient.render`, the clip applied and the `image@2` result), `ClipOrigin`, `RENDER_MEDIA_TYPES` (the inputs `pdf.render@2` opens: PDF, PNG, JPEG), `check_renderable` (pre-validates a source file against `RENDER_MEDIA_TYPES`), `plan_downscale` (the longest side a downscale would render and the file suffix, or nothing when the image would not shrink), `downscale_image` (scales a PNG/JPEG through `pdf.render@2` using docstruct header dimensions); `ToolboxPdfClient.text_spans_by_page` reads the `text-spans@1` pages of any number of pages, in calls of at most `TEXT_SPANS_MAX_PAGES` |
@@ -307,3 +308,14 @@ Artifact downloads by ID also try the next compatible endpoint after a 404.
 This exception is limited to `ToolboxArtifactClient.download`: other 4xx errors
 and capability calls keep their existing behavior. When every endpoint returns
 404, the SDK raises `ToolboxArtifactNotFound`; integrity failures are not retried.
+
+## Text normalization
+
+Use `normalization_batches([TextTarget(id="p1", text="ﬁrst  text")])` and
+await `client.normalize(batch)` for each returned batch, using a
+`ToolboxTextNormalizeClient` configured with `make_client`. Its provider key is
+`toolbox_text_normalize_provider` (default `docstruct-text`). Retain the original
+batches across retries; apply results only after checking the current caller
+context. A target exceeding the 1 MiB request boundary is rejected, never split.
+See the [consumer report](../../docs/architecture/norm-fix-consumer.md) for recovery
+and compatibility limits.

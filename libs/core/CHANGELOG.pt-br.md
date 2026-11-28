@@ -2,6 +2,28 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.31 — normalização remota em uma passagem (#929)
+
+Após revisão: slots do diário de normalização também vinculam endpoints e a
+revisão de implantação existente (`PROCESSING_MODEL_REVISION` nas opções do
+checkpoint de execução). Incremente-a quando a configuração do provider mudar
+sem novo id/versão. Construção pública dos lotes, cancelamento/publicação e
+invalidação de cache/checkpoints legados têm regressões específicas; o relatório
+documenta upgrade/rollback e a descrição congelada do domínio como histórica (#950).
+
+`norm-fix` agora usa `document.text.normalize@1` pelo SDK 0.7.1, após os PRs
+Toolbox #174/#177. O Core preserva seleção de alvos, metadados e aceite;
+as requisições são delimitadas por quantidade e bytes UTF-8 serializados.
+Vínculo estrito da resposta e verificação do contexto atual precedem uma única
+atualização atômica da obrigação. Os diários de operação existentes preservam a
+identidade dos lotes originais entre tentativas/retomadas; não há fallback local
+do algoritmo. O gate de disponibilidade e a identidade de processamento incluem
+o novo provider. Referências diferenciais históricas, qualificação HTTP real e
+limites estão no [relatório do consumidor](../../docs/architecture/norm-fix-consumer.pt-br.md).
+Agrupar obrigações continua uma decisão de planejamento separada (#948); os
+demais métodos locais continuam como dívida da #804. Os hashes do domínio PDDL
+publicado permanecem iguais.
+
 ## 0.3.30 — a rejeição de admissão local chega ao planejador como adiamento retentável (#828)
 
 As etapas de enriquecimento de documento já registravam `admission_rejected`

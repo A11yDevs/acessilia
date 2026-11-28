@@ -147,6 +147,26 @@ def test_an_interruption_beside_another_failure_is_not_accepted() -> None:
         _interruption(ValueError("invalid state"))
 
 
+def test_normalization_resume_keeps_a_committed_one_pass_result(tmp_path, job_checkpoints):
+    """A second normalization failure cannot make the first step normalize twice."""
+    spec = build_cases.CASES["text-normalization"]
+    case = _case(tmp_path, "normalization-resume", spec)
+    whole = run_case(case)
+    store = {}
+    _dies(case, checkpoints=job_checkpoints(), interrupt=("document.text.normalize", 2), toolbox_store=store)
+    state = job_checkpoints().load("execution")
+    assert state is not None and "step_progress" not in state
+    elements = {item["id"]: item for item in state["manifest"]["elements"]}
+    assert elements["p1"]["metadata"]["norm_fixed"] is True
+    assert "ab-\nc" in elements["p1"]["text"]
+    assert elements["p2"]["metadata"]["norm_fixed"] is False
+    resumed = run_case(case, checkpoints=job_checkpoints(), toolbox_store=store)
+    assert resumed["canonical"] == whole["canonical"]
+    assert whole["unhandled"] == resumed["unhandled"] == []
+    assert whole["calls"].get("document.text.normalize") == 2
+    assert resumed["calls"].get("document.text.normalize") == 1
+
+
 def _case(tmp_path: Path, name: str, spec: dict[str, Any]) -> Path:
     target = tmp_path / name / "case.json"
     target.parent.mkdir(parents=True)
@@ -223,3 +243,27 @@ def test_a_run_without_checkpoints_starts_over(tmp_path) -> None:
 
     assert interrupted.served == [("vlm", "pic1")]
     assert [element for kind, element in again["served"] if kind == "vlm"] == ["pic1", "pic2", "pic3"]
+
+
+def test_normalizer_upgrade_invalidates_legacy_identity_and_restarts_from_source(
+    tmp_path, job_checkpoints
+):
+    from acessilia_core import run_identity
+
+    case = _case(tmp_path, "normalization-upgrade", build_cases.CASES["text-normalization"])
+    whole = run_case(case)
+    legacy_providers = run_identity.PROCESSING_PROVIDERS - {"toolbox_text_normalize_provider"}
+    # Emulate the 0.3.29 identity, which had no normalization provider. Keep a
+    # committed, non-fixed-point first step and an interrupted second one.
+    with patch.object(run_identity, "PROCESSING_PROVIDERS", legacy_providers):
+        _dies(case, checkpoints=job_checkpoints(), interrupt=("document.text.normalize", 2))
+    state = job_checkpoints().load("execution")
+    first = next(item for item in state["manifest"]["elements"] if item["id"] == "p1")
+    assert "ab-\nc" in first["text"] and first["metadata"]["norm_fixed"] is True
+
+    resumed = run_case(case, checkpoints=job_checkpoints())
+    assert resumed["canonical"] == whole["canonical"]
+    # The media identity changed too: no old processed manifest is input to
+    # another normalization pass. Fresh extraction supplies original text.
+    assert resumed["calls"].get("document.structure.extract") == 1
+    assert resumed["calls"].get("document.text.normalize") == 2

@@ -1,0 +1,107 @@
+{
+  "description": "Remote one-pass text normalization: legacy text, metadata and obligations (#929).",
+  "document": {
+    "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "revision": 1,
+    "status": "extracted",
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "p1",
+          "p2",
+          "p3"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "p1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "ﬁrst  text a-\nb-\nc. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 220.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {
+          "keep": "first",
+          "norm_fixed": false
+        }
+      },
+      {
+        "id": "p2",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 2,
+        "hierarchy_level": 1,
+        "text": "soft­ hyphen  text. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 240.0,
+              "right": 540.0,
+              "bottom": 420.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {
+          "keep": "second",
+          "norm_fixed": false
+        }
+      },
+      {
+        "id": "p3",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 3,
+        "hierarchy_level": 1,
+        "text": "$$ a  b $$",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 440.0,
+              "right": 540.0,
+              "bottom": 500.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {
+          "keep": "protected"
+        }
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 1,
+      "element_count": 3,
+      "observation_count": 0,
+      "obligation_count": 0,
+      "element_types": {}
+    }
+  }
+}

@@ -18,7 +18,7 @@ truth (os benchmarks da #619).
 
 O que os casos estabelecem se limita ao que eles rodam:
 
-- oito documentos sintéticos, de uma a três páginas;
+- nove documentos sintéticos, de uma a três páginas;
 - um provedor de extração, exceto em `dual-provider` (`FUSION_MODE=dual`), que
   exercita a adjudicação de página, o `select-table-source` e uma página
   roteada para o provedor secundário com o `rescue-omitted`. O
@@ -105,6 +105,7 @@ mudança no que é enviado aparece na saída.
 | Caso | O que cobre |
 |---|---|
 | `text-and-picture` | uma figura descrita (M1) |
+| `text-normalization` | normalização de uma passagem, metadados e texto protegido |
 | `tables` | uma tabela lida da sua imagem e uma já estruturada (M2) |
 | `formulas` | uma fórmula sem marcação LaTeX, classificada e lida (M4a, M3); uma com LaTeX; uma figura que o modelo de visão lê como fórmula (M1, #846) |
 | `mostly-visual` | uma página sem conteúdo textual, cujos visuais de placeholder são descritos |
@@ -151,6 +152,14 @@ falso deu depois de ela passar no schema, o tipo e o elemento a que se
 referia. Como `calls`, é diagnóstico nas referências e nunca é comparado
 entre cores; o teste de retomada abaixo o confere, só nesta árvore. O mesmo
 vale para `converted` (conversões por expressão LaTeX).
+
+A regravação da #929 mudou apenas a ordem de conclusão nos diagnósticos
+`served` de duas referências históricas de `formulas` e duas de `mostly-visual`.
+Tarefas independentes de fórmula/imagem executam concorrentemente; o escalonamento
+não garante ordem semântica. As gravações brutas foram preservadas. Testes
+específicos comparam os multiconjuntos de respostas, incluindo multiplicidade,
+às observações congeladas anteriores à #929; os demais campos e os 40
+documentos canônicos existentes permaneceram idênticos.
 
 **`SOURCE.json`** registra o commit, a versão do core e a identidade do
 harness (`runner.identity`): os SHA-256 do runner, do falso, dos casos e do
@@ -345,6 +354,16 @@ Os casos acrescentados pela #876 (core 0.3.23) mostram:
   `formulas`.
 
 ## Retomada a partir de um checkpoint (#874)
+
+`text-normalization` também compara o consumidor da #929 à execução local
+histórica. O falso serve o contrato de uma passagem usando Docstruct apenas no
+servidor de teste, com proveniência vinculada à entrada. Interromper antes da
+segunda obrigação de normalização retoma do primeiro passo consolidado,
+preservando seu resultado que não é ponto fixo (`a-\nb-\nc` vira `ab-\nc`, não
+`abc`). Dentro de uma obrigação com vários lotes, nenhuma observação é aplicada
+ou salva antes de validar todas; uma interrupção repete os lotes originais
+imutáveis, com ids no diário quando o host fornece essa porta. Isso não promete
+execução única distribuída. A granularidade das obrigações existentes é preservada.
 
 Uma retomada compara uma execução com ela mesma, então o oráculo é o mesmo
 caso rodado sem interrupção, não um core mais antigo (o formato do

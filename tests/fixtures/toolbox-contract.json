@@ -79,6 +79,36 @@
       }
     },
     {
+      "id": "audio.synthesize",
+      "version": 1,
+      "providers": [
+        "edge-tts",
+        "piper-tts"
+      ],
+      "input": {
+        "schema": "artifact/document@1",
+        "media_types": [
+          "text/plain",
+          "text/markdown"
+        ],
+        "by_reference": false
+      },
+      "output": {
+        "schema": "artifact/audio-export@1",
+        "media_types": [
+          "audio/mpeg",
+          "audio/wav"
+        ],
+        "by_reference": true
+      },
+      "execution": {
+        "deterministic": true,
+        "idempotent": true,
+        "cacheable": true,
+        "timeout_hint_seconds": 300
+      }
+    },
+    {
       "id": "chem.convert",
       "version": 1,
       "providers": [
@@ -604,6 +634,33 @@
       }
     },
     {
+      "id": "document.text.normalize",
+      "version": 1,
+      "providers": [
+        "docstruct-text"
+      ],
+      "input": {
+        "schema": "artifact/text-normalization-request@1",
+        "media_types": [
+          "application/json"
+        ],
+        "by_reference": false
+      },
+      "output": {
+        "schema": "artifact/text-normalization-result@1",
+        "media_types": [
+          "application/json"
+        ],
+        "by_reference": false
+      },
+      "execution": {
+        "deterministic": true,
+        "idempotent": true,
+        "cacheable": true,
+        "timeout_hint_seconds": 5
+      }
+    },
+    {
       "id": "document.text.spans",
       "version": 1,
       "providers": [
@@ -1041,6 +1098,18 @@
       ]
     },
     {
+      "id": "docstruct-text",
+      "capabilities": [
+        "document.text.normalize"
+      ]
+    },
+    {
+      "id": "edge-tts",
+      "capabilities": [
+        "audio.synthesize"
+      ]
+    },
+    {
       "id": "filesystem",
       "capabilities": [
         "artifact.retrieve",
@@ -1101,6 +1170,12 @@
       "id": "pandoc-pdf-ua",
       "capabilities": [
         "document.export.pdf_ua"
+      ]
+    },
+    {
+      "id": "piper-tts",
+      "capabilities": [
+        "audio.synthesize"
       ]
     },
     {
@@ -1245,6 +1320,12 @@
       "ref": "artifact/accessibility-report@1",
       "status": "published",
       "file": "schemas/accessibility-report@1.json",
+      "note": null
+    },
+    {
+      "ref": "artifact/audio-export@1",
+      "status": "published",
+      "file": "schemas/audio-export@1.json",
       "note": null
     },
     {
@@ -1455,6 +1536,18 @@
       "ref": "artifact/table-candidates@1",
       "status": "published",
       "file": "schemas/table-candidates@1.json",
+      "note": null
+    },
+    {
+      "ref": "artifact/text-normalization-request@1",
+      "status": "published",
+      "file": "schemas/text-normalization-request@1.json",
+      "note": null
+    },
+    {
+      "ref": "artifact/text-normalization-result@1",
+      "status": "published",
+      "file": "schemas/text-normalization-result@1.json",
       "note": null
     },
     {

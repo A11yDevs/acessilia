@@ -48,6 +48,8 @@ SDK_MODEL_SCHEMAS = (
     "media-inspection@1.json",
     "image@2.json",
     "text-spans@1.json",
+    "text-normalization-request@1.json",
+    "text-normalization-result@1.json",
     "dataset-info@1.json",
     "dataset-split@1.json",
     "dataset-item-summary@1.json",

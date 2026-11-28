@@ -1,8 +1,9 @@
 """Deterministic handlers that repair text in place.
 
 Unicode and negation-overlay repair, normalization, the repetition guard, line
-numbers, verse chunking, tail joins and the heading hierarchy. None calls a
-model or the Toolbox. Moved verbatim from the PDDL orchestrator (#402, phase 3,
+numbers, verse chunking, tail joins and the heading hierarchy. Normalization
+delegates to the remote handler; the other handlers remain transitional.
+Moved from the PDDL orchestrator (#402, phase 3,
 step 6); ``handlers/registry.py``'s ``METHOD_HANDLERS`` registers them.
 """
 
@@ -28,8 +29,6 @@ from acessilia_core.pipeline.handlers.messages import (
     MSG_HEADING_REPAIRED,
     MSG_LINE_NUMBERS_EXTRACTED,
     MSG_LINE_NUMBERS_NONE,
-    MSG_NORMALIZE_APPLIED,
-    MSG_NORMALIZE_NO_TEXT,
     MSG_REPETITION_NONE,
     MSG_REPETITION_REMOVED,
     MSG_TAILJOIN_JOINED,
@@ -45,6 +44,7 @@ from acessilia_core.pipeline.handlers.structure import (
     split_provenance,
     unique_element_id,
 )
+from acessilia_core.pipeline.handlers.text_normalization import _handle_norm_fix_method
 from acessilia_core.pipeline.handlers.unicode_repair import (
     _handle_unicode_repair_method,
     _reattach_negation_overlays,
@@ -53,7 +53,6 @@ from acessilia_core.pipeline.handlers.unicode_repair import (
 from docstruct.fusion.noise import element_role
 from docstruct.fusion.tailjoin import page_number_position
 from docstruct.sections import repair_heading_levels
-from docstruct.text.norm_fix import norm_fix
 
 __all__ = [
     "_handle_chunk_verse_method",
@@ -66,38 +65,6 @@ __all__ = [
     "_reattach_negation_overlays",
     "_repair_table_cells",
 ]
-
-
-def _handle_norm_fix_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Apply the deterministic text cleanups (ligatures, hyphenation, NBSP)."""
-    elements = _target_elements(manifest, obligation_id)
-    if not elements:
-        return _missing_obligation(obligation_id)
-
-    fixed = 0
-    for element in elements:
-        current = element.text or ""
-        if not current:
-            continue
-        cleaned = norm_fix(current)
-        if cleaned != current:
-            element.text = cleaned
-            element.metadata["norm_fixed"] = True
-        fixed += 1
-
-    if not fixed:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=t(MSG_NORMALIZE_NO_TEXT),
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=n(*MSG_NORMALIZE_APPLIED, fixed).format(count=fixed),
-    )
 
 
 def _handle_repetition_guard_method(

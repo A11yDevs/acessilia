@@ -8,7 +8,7 @@ resolution-markers = [
 
 [[package]]
 name = "acessilia-core"
-version = "0.3.30"
+version = "0.3.31"
 source = { editable = "." }
 dependencies = [
     { name = "acessilia-docstruct" },
@@ -64,7 +64,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "acessilia-sdk"
-version = "0.7.0"
+version = "0.7.1"
 source = { editable = "../sdk" }
 dependencies = [
     { name = "acessilia-docstruct" },

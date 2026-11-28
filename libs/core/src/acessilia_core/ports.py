@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, TypeVar
+from typing import Any, Literal, NewType, Protocol, TypeVar
 
 from acessilia_core.config import VisionConfig
 
@@ -73,8 +73,10 @@ class JobCheckpoints(Protocol):
         """Drop the phase's payload, if any."""
 
 
-#: The remote calls of an extraction a job can cancel (ADR-0019).
-OperationKind = Literal["upload", "primary", "secondary"]
+#: A normalization slot includes its immutable input/context digest, so distinct
+#: batches or revisions never reuse an extraction slot or another request's id.
+NormalizationOperationSlot = NewType("NormalizationOperationSlot", str)
+OperationKind = Literal["upload", "primary", "secondary"] | NormalizationOperationSlot
 
 
 class RemoteOperations(Protocol):
@@ -189,6 +191,7 @@ __all__ = [
     "PHASE_PLAN",
     "JobCheckpoints",
     "NoRegionCache",
+    "NormalizationOperationSlot",
     "OperationKind",
     "RegionCache",
     "RemoteOperations",

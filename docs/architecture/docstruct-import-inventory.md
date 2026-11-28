@@ -217,7 +217,7 @@ is the order the migration can follow, per plan method or agent (ADR-0028):
 | `docstruct.text.math_spans` | algorithm | `block_prose`, `inline_math_sources` | `pipeline/handlers/formula` |
 | `docstruct.text.named_operators` | algorithm | `normalize_named_operators`, `speak_named_operators` | `pipeline/handlers/formula` |
 | `docstruct.text.negation_overlay` | algorithm | `compose_in_grid`, `compose_in_text`, `is_detached_overlay` | `pipeline/enrichment/inline_math`, `pipeline/handlers/unicode_repair` |
-| `docstruct.text.norm_fix` | algorithm | `norm_fix` | `agents/fusion_agent`, `manifest/detectors/text`, `pipeline/handlers/text` |
+| `docstruct.text.norm_fix` | algorithm | `norm_fix` | `agents/fusion_agent`, `manifest/detectors/text`; handler execution migrated to Toolbox (#929) |
 | `docstruct.text.paragraphs` | algorithm | `merge_broken_paragraphs` | `backend/service` |
 | `docstruct.text.unicode_repair` | algorithm | `Detection`, `UnicodeRepairContext`, `detect_legacy_unicode`, `repair_legacy_unicode` | `manifest/detectors/text`, `pipeline/handlers/unicode_repair` |
 | `docstruct.types` | algorithm | `Region` | `agents/fusion_agent` |

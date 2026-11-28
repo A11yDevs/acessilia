@@ -2309,6 +2309,13 @@ msgstr "No code block found for the obligation"
 msgid "No text eligible for normalization"
 msgstr "No text eligible for normalization"
 
+#, python-brace-format
+msgid "Text normalization failed ({reason}); no targets were updated"
+msgstr "Text normalization failed ({reason}); no targets were updated"
+
+msgid "Text normalization response is stale; no targets were updated"
+msgstr "Text normalization response is stale; no targets were updated"
+
 msgid "No text eligible for Unicode repair"
 msgstr "No text eligible for Unicode repair"
 

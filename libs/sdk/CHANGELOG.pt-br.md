@@ -7,6 +7,17 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Corrigido (revisão da 0.7.1)** A construção direta de `NormalizationBatch`
+  agora valida correspondência canônica de payload/alvos, DTOs estritos, limites
+  e unicidade uma vez, antes de qualquer tentativa HTTP. Listas do chamador são
+  capturadas; retries reutilizam os mesmos bytes imutáveis já validados (#950).
+- **Adicionado (0.7.1)** `ToolboxTextNormalizeClient` para o contrato publicado
+  `document.text.normalize@1`, modelos estritos de alvo/resultado gerados,
+  lotes imutáveis (256 alvos / 1 MiB UTF-8 serializado), vetores de fingerprint
+  compartilhados com o provider e validação de proveniência/contagem/ordem/flags.
+  `toolbox.text_normalization` exporta DTOs e funções do protocolo; a configuração
+  de provider continua explícita. Sem fallback local de normalização (#929).
+
 - **Alterado** `ToolboxUnavailable` agora escolhe uma mensagem adequada às suas
   causas em vez de sempre alegar indisponibilidade. Quando ao menos uma causa
   não é exclusivamente timeout ou indisponibilidade (por exemplo, uma

@@ -283,7 +283,10 @@ class Compiler:
             "from __future__ import annotations",
             "",
             "from dataclasses import dataclass",
-            "from typing import Any",
+            *(["from typing import Any"] if readers or any(
+                "Any" in self.annotation(prop)
+                for rule in self.classes.values() for prop in rule["properties"].values()
+            ) else []),
             "",
             f"from acessilia_sdk.toolbox.results._model import {model_import}",
             "",

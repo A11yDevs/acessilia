@@ -1,0 +1,229 @@
+{
+  "source": {
+    "repository": "A11yDevs/acessilia",
+    "commit": "cb96e0a2517e3be35410bd17987745966bda165d",
+    "handler": "libs/core/src/acessilia_core/pipeline/handlers/text.py:_handle_norm_fix_method",
+    "docstruct": "0.5.8"
+  },
+  "cases": [
+    {
+      "name": "mixed",
+      "input": [
+        {
+          "id": "b0",
+          "text": "ﬁ  text",
+          "metadata": {
+            "keep": 0,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b1",
+          "text": "",
+          "metadata": {
+            "keep": 1,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b2",
+          "text": null,
+          "metadata": {
+            "keep": 2,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b3",
+          "text": "$$ a  b $$",
+          "metadata": {
+            "keep": 3,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b4",
+          "text": "already clean",
+          "metadata": {
+            "keep": 4,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b5",
+          "text": "a-\nb-\nc",
+          "metadata": {
+            "keep": 5,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b6",
+          "text": "ﬁ  text",
+          "metadata": {
+            "keep": 6,
+            "norm_fixed": false
+          }
+        }
+      ],
+      "output": [
+        {
+          "id": "b0",
+          "text": "fi text",
+          "metadata": {
+            "keep": 0,
+            "norm_fixed": true
+          }
+        },
+        {
+          "id": "b1",
+          "text": "",
+          "metadata": {
+            "keep": 1,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b2",
+          "text": null,
+          "metadata": {
+            "keep": 2,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b3",
+          "text": "$$ a  b $$",
+          "metadata": {
+            "keep": 3,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b4",
+          "text": "already clean",
+          "metadata": {
+            "keep": 4,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b5",
+          "text": "ab-\nc",
+          "metadata": {
+            "keep": 5,
+            "norm_fixed": true
+          }
+        },
+        {
+          "id": "b6",
+          "text": "fi text",
+          "metadata": {
+            "keep": 6,
+            "norm_fixed": true
+          }
+        }
+      ],
+      "success": true,
+      "validated": true
+    },
+    {
+      "name": "no_text",
+      "input": [
+        {
+          "id": "b0",
+          "text": "",
+          "metadata": {
+            "keep": 0,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b1",
+          "text": null,
+          "metadata": {
+            "keep": 1,
+            "norm_fixed": false
+          }
+        }
+      ],
+      "output": [
+        {
+          "id": "b0",
+          "text": "",
+          "metadata": {
+            "keep": 0,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b1",
+          "text": null,
+          "metadata": {
+            "keep": 1,
+            "norm_fixed": false
+          }
+        }
+      ],
+      "success": false,
+      "validated": false
+    },
+    {
+      "name": "all_noop",
+      "input": [
+        {
+          "id": "b0",
+          "text": "already clean",
+          "metadata": {
+            "keep": 0,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b1",
+          "text": "| a |  b |",
+          "metadata": {
+            "keep": 1,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b2",
+          "text": " ",
+          "metadata": {
+            "keep": 2,
+            "norm_fixed": false
+          }
+        }
+      ],
+      "output": [
+        {
+          "id": "b0",
+          "text": "already clean",
+          "metadata": {
+            "keep": 0,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b1",
+          "text": "| a |  b |",
+          "metadata": {
+            "keep": 1,
+            "norm_fixed": false
+          }
+        },
+        {
+          "id": "b2",
+          "text": " ",
+          "metadata": {
+            "keep": 2,
+            "norm_fixed": false
+          }
+        }
+      ],
+      "success": true,
+      "validated": true
+    }
+  ]
+}

@@ -244,7 +244,7 @@ class Settings:
         default_factory=lambda: os.getenv("INLINE_MATH_DETECTION", "fonts").strip().lower()
     )
 
-    # Bump on remote model deployments that retain the same URL/model name.
+    # Bump on remote model/provider configuration changes retaining URL/id/version.
     processing_model_revision: str = field(
         default_factory=lambda: os.getenv("PROCESSING_MODEL_REVISION", "")
     )
@@ -354,6 +354,12 @@ class Settings:
         default_factory=lambda: os.getenv(
             "TOOLBOX_MEDIA_INSPECT_PROVIDER",
             provider_default("toolbox_media_inspect_provider"),
+        )
+    )
+    toolbox_text_normalize_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_TEXT_NORMALIZE_PROVIDER",
+            provider_default("toolbox_text_normalize_provider"),
         )
     )
     toolbox_pdf_ua_provider: str = field(
