@@ -153,6 +153,14 @@ referia. Como `calls`, é diagnóstico nas referências e nunca é comparado
 entre cores; o teste de retomada abaixo o confere, só nesta árvore. O mesmo
 vale para `converted` (conversões por expressão LaTeX).
 
+A regravação da #929 mudou apenas a ordem de conclusão nos diagnósticos
+`served` de duas referências históricas de `formulas` e duas de `mostly-visual`.
+Tarefas independentes de fórmula/imagem executam concorrentemente; o escalonamento
+não garante ordem semântica. As gravações brutas foram preservadas. Testes
+específicos comparam os multiconjuntos de respostas, incluindo multiplicidade,
+às observações congeladas anteriores à #929; os demais campos e os 40
+documentos canônicos existentes permaneceram idênticos.
+
 **`SOURCE.json`** registra o commit, a versão do core e a identidade do
 harness (`runner.identity`): os SHA-256 do runner, do falso, dos casos e do
 PDF de origem, e as versões dos pacotes que o falso acrescenta (Pillow e

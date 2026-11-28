@@ -261,3 +261,81 @@ async def test_invalid_input_conflict_is_not_retried_or_failed_over(respx_mock):
     finally:
         await client.close()
     assert route.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "targets,payload",
+    [
+        ([TextTarget("p1", "original")], b'{"targets":[{"id":"p1","text":"other"}]}'),
+        ([TextTarget("p1", "x"), TextTarget("p1", "x")], None),
+        ([TextTarget(str(i), "x") for i in range(257)], None),
+        ([TextTarget("x" * 257, "x")], None),
+        ([TextTarget("", "x")], None),
+        ([TextTarget("p1", 12)], None),
+        ([TextTarget("p1", "\ud800")], None),
+        ([TextTarget("p1", "x" * MAX_PAYLOAD_BYTES)], None),
+        ([TextTarget("p1", "x")], bytearray(b"{}")),
+    ],
+    ids=[
+        "mismatch",
+        "duplicates",
+        "count",
+        "long-id",
+        "empty-id",
+        "type",
+        "unicode",
+        "bytes",
+        "mutable-payload",
+    ],
+)
+def test_direct_batches_refuse_inconsistent_or_unbounded_requests_before_rpc(
+    respx_mock, targets, payload
+):
+    from acessilia_sdk.toolbox.text_normalization import NormalizationBatch
+
+    # The invalid Unicode case cannot even be encoded; supply independent bytes.
+    if payload is None:
+        try:
+            payload = canonical_json(
+                {"targets": [target.to_dict() for target in targets]}
+            )
+        except UnicodeError:
+            payload = b"{}"
+    with pytest.raises(ToolboxInvalidInput):
+        NormalizationBatch(targets, payload)
+    assert not respx_mock.calls
+
+
+def test_direct_batch_snapshots_caller_list_and_is_not_revalidated_on_http_retries(
+    monkeypatch, respx_mock
+):
+    from acessilia_sdk.runtime import run_sync
+    from acessilia_sdk.toolbox.text_normalization import NormalizationBatch
+
+    targets = [TextTarget("p1", "ﬁrst")]
+    payload = canonical_json({"targets": [target.to_dict() for target in targets]})
+    batch = NormalizationBatch(targets, payload)
+    targets.clear()
+    assert batch.targets == (TextTarget("p1", "ﬁrst"),)
+
+    def no_validation(_self):
+        pytest.fail("an HTTP retry must reuse the validated request")
+
+    monkeypatch.setattr(NormalizationBatch, "__post_init__", no_validation)
+    route = respx_mock.post(
+        "http://toolbox.test/v1/capabilities/document.text.normalize:execute"
+    )
+    route.side_effect = [httpx.Response(503), httpx.Response(200, json=response(batch))]
+
+    async def send():
+        client = ToolboxTextNormalizeClient(
+            base_url="http://toolbox.test", retries=1, retry_backoff_seconds=0
+        )
+        try:
+            await client.normalize(batch)
+        finally:
+            await client.close()
+
+    run_sync(send())
+    assert len(route.calls) == 2
+    assert all(multipart(call.request)["file"] == payload for call in route.calls)

@@ -371,3 +371,49 @@ def test_older_toolbox_without_capability_fails_without_local_repair(respx_mock)
     assert not result.success and not result.validated
     assert manifest.model_dump_json() == original
     assert route.call_count == 1
+
+
+def test_provider_configuration_revision_rotates_journal_identity(provider, respx_mock):
+    from types import SimpleNamespace
+
+    journal = {}
+    descriptor = {"configuration": "a"}
+    retained = {}
+    requests = []
+    provider.outputs = {"e0": "fi"}
+
+    def execute(request):
+        operation_id = request.headers["X-Acessilia-Operation-Id"]
+        requests.append((operation_id, request.content))
+        if (
+            operation_id in retained
+            and retained[operation_id] != descriptor["configuration"]
+        ):
+            return httpx.Response(
+                400,
+                json={
+                    "code": "invalid_input",
+                    "message": "operation request identity differs",
+                },
+            )
+        retained[operation_id] = descriptor["configuration"]
+        return provider.answer(request)
+
+    respx_mock.post(ENDPOINT).mock(side_effect=execute)
+
+    def run(revision):
+        ports = replace(
+            RunPorts.none(),
+            operations=Operations(journal),
+            checkpoints=SimpleNamespace(
+                options={"execution": {"processing_model_revision": revision}}
+            ),
+        )
+        return normalize(manifest_for(["ﬁ"]), ports)
+
+    assert run("configuration-a").success
+    descriptor["configuration"] = "b"
+    assert not run("configuration-a").success
+    assert run("configuration-b").success
+    assert requests[0][0] == requests[1][0] != requests[2][0]
+    assert len(journal) == 2

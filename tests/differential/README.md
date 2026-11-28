@@ -145,6 +145,13 @@ once it passed its schema, the kind and the element it was for. Like
 cores; the resume test below asserts on it, on this tree only.
 `converted` (conversions per LaTeX expression) is the same.
 
+The #929 re-recording changed only completion order in the `served` diagnostics
+of two historical `formulas` and two `mostly-visual` references. Independent
+formula/picture tasks run concurrently; scheduling is not a semantic order
+guarantee. The raw recordings are preserved. Dedicated tests compare their
+answer multisets (including multiplicity) with frozen pre-#929 observations;
+all other fields and the 40 existing canonical documents remained identical.
+
 **`SOURCE.json`** names the commit and core version, and the harness's
 identity (`runner.identity`): SHA-256 digests of the runner, the fake, the
 cases and the source PDF, and the versions of the packages the fake adds

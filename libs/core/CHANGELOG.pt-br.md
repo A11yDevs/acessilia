@@ -4,6 +4,13 @@ Inglês, versão normativa: [English version](CHANGELOG.md).
 
 ## 0.3.30 — normalização remota em uma passagem (#929)
 
+Após revisão: slots do diário de normalização também vinculam endpoints e a
+revisão de implantação existente (`PROCESSING_MODEL_REVISION` nas opções do
+checkpoint de execução). Incremente-a quando a configuração do provider mudar
+sem novo id/versão. Construção pública dos lotes, cancelamento/publicação e
+invalidação de cache/checkpoints legados têm regressões específicas; o relatório
+documenta upgrade/rollback e a descrição congelada do domínio como histórica (#950).
+
 `norm-fix` agora usa `document.text.normalize@1` pelo SDK 0.7.1, após os PRs
 Toolbox #174/#177. O Core preserva seleção de alvos, metadados e aceite;
 as requisições são delimitadas por quantidade e bytes UTF-8 serializados.

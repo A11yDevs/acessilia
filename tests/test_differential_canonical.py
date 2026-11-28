@@ -223,3 +223,22 @@ def test_a_difference_declared_for_every_case_still_happens(runs, label) -> None
     stale = [entry for index, entry in enumerate(common) if index not in used_indices]
     assert not stale, f"{label}/intended.json declares differences no case has: {stale}"
 
+
+
+@pytest.mark.parametrize("label", ["core-0.3.11", "core-0.3.13"])
+def test_rerecorded_formula_diagnostics_keep_the_historical_answer_multiset(label):
+    from collections import Counter
+
+    # Frozen pre-#929 observations: parallel workers may finish in either
+    # order, but re-recording must not add/drop an answer or its multiplicity.
+    expected = [("vlm", "f1"), ("vlm", "pic1"), ("math.recognize", "f1"),
+                ("math.recognize", "pic1"), ("vlm", "pic1")]
+    assert Counter(map(tuple, _reference(label, "formulas")["served"])) == Counter(expected)
+
+
+@pytest.mark.parametrize("label", ["core-0.3.14", "core-0.3.19"])
+def test_rerecorded_picture_diagnostics_keep_the_historical_answer_multiset(label):
+    from collections import Counter
+
+    expected = [("vlm", "g1"), ("vlm", "g2")]
+    assert Counter(map(tuple, _reference(label, "mostly-visual")["served"])) == Counter(expected)

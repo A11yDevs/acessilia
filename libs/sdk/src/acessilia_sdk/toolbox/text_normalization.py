@@ -46,10 +46,39 @@ def target_fingerprint(target: TextTarget) -> str:
 
 @dataclass(frozen=True)
 class NormalizationBatch:
-    """An immutable original request, reused unchanged by HTTP retries."""
+    """A validated immutable request, reused unchanged by HTTP retries.
+
+    Direct construction has the same contract as ``normalization_batches``.
+    Validate once at construction, before transport can make an HTTP attempt.
+    """
 
     targets: tuple[TextTarget, ...]
     payload: bytes
+
+    def __post_init__(self) -> None:
+        try:
+            if (
+                not isinstance(self.payload, bytes)
+                or len(self.payload) > MAX_PAYLOAD_BYTES
+            ):
+                raise ValueError(
+                    "normalization payload must be bounded immutable bytes"
+                )
+            request = decode(
+                {"targets": [item.to_dict() for item in self.targets]},
+                TextNormalizationRequest._rule,
+                TextNormalizationRequest._models,
+                "normalization request",
+                strict=True,
+            )
+            targets = tuple(request.targets)
+            if len({item.id for item in targets}) != len(targets):
+                raise ValueError("normalization target ids must be unique")
+            if self.payload != canonical_json(request.to_dict()):
+                raise ValueError("normalization payload differs from canonical targets")
+            object.__setattr__(self, "targets", targets)
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ToolboxInvalidInput(f"Invalid normalization batch: {exc}") from exc
 
 
 @dataclass(frozen=True)

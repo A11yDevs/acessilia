@@ -16,7 +16,9 @@ those files. This follows accepted [ADR-0032](../adr/0032-toolbox-runtime-librar
 The Core selects the existing obligation's targets in reading order, decides
 acceptance and updates its metadata. The SDK snapshots/encodes bounded DTOs,
 uses the public authenticated executor transport and validates observations.
-Only the Toolbox invokes the normalization algorithm. `text.postprocess@1`
+Only the Toolbox produces the accepted result of the `norm-fix` method.
+The detector still predicts changes locally and the legacy fusion wrapper
+still exposes a local tool; removing that computation is migration debt (#948). `text.postprocess@1`
 remains a separate contract with different marker/deduplication semantics.
 
 Empty/null targets remain unchanged and require no request. Missing targets,
@@ -38,7 +40,9 @@ Transport budgets, cache policy and authorized endpoint failover use the run's
 existing Toolbox configuration. No new queue, image or service is required.
 
 The shipped PDDL domain/description remain frozen so saved-plan hashes stay
-valid. Existing obligation granularity is preserved: the default detector
+valid. Their description of the local normalization implementation is historical;
+this living report describes the remote handler. Domain hashes alone do not
+establish checkpoint compatibility (see the upgrade policy below). Existing obligation granularity is preserved: the default detector
 currently emits one normalization obligation per affected element. A multi-target
 obligation uses bounded batches; independent obligations are not merged or
 prefetched. [#948](https://github.com/A11yDevs/acessilia/issues/948) evaluates that
@@ -46,6 +50,10 @@ remaining planning/performance decision and removal of local prediction.
 
 ## Binding, atomic acceptance and recovery
 
+- Public `NormalizationBatch` construction checks canonical payload/target
+  agreement, strict types, ids, uniqueness and request limits once and snapshots
+  caller lists. HTTP retries reuse those validated immutable bytes. The factory
+  additionally preserves global uniqueness/order when partitioning many batches.
 - Each request has at most 256 unique ids (1–256 characters) and **1,048,576
   serialized UTF-8 bytes**, including envelope, separators and escaping.
   Oversized indivisible text/ids are refused, never truncated or split across
@@ -77,6 +85,50 @@ remaining planning/performance decision and removal of local prediction.
   acknowledgement is not preemption or rollback of started storage/cache writes.
   Inline observations use the existing remote storage/cache/retention policy.
 
+## Upgrade, rollback and deployment configuration
+
+Adding the normalization provider changes the processing cache key and every
+Toolbox-dependent stage identity, including media/extraction. A stamped 0.3.29
+checkpoint without that provider is rejected from the first changed phase;
+all later phases are recomputed from the source, never by normalizing the saved
+processed text again. New-version retries with unchanged identity reuse the
+committed step; interrupted batches retain their original input. Checkpoints
+predating configuration stamps retain the existing warning-and-reuse policy;
+remove those checkpoints before an upgrade/rollback when compatibility is unknown.
+A cache miss retains the old entry until normal expiration; it is not a purge.
+
+A provider id/version does not reveal its private descriptor configuration.
+Before changing provider configuration, model weights or algorithm/runtime
+behavior at the same endpoint/id/version, **bump `PROCESSING_MODEL_REVISION`**.
+The service already places it in cache identity and enrichment/execution
+checkpoint options. Normalization now also binds that revision, endpoint
+configuration and original batch into its journal slot. This rotates the id
+rather than endlessly reusing one the Toolbox rejects as a different request.
+Unchanged revisions preserve stable retries; no automatic descriptor-change
+detection is claimed. A mismatch remains a permanent explicit failure, with no
+blind id rotation/retry that might hide changed work. Library hosts retaining
+operation journals must pass their deployment revision through the existing
+execution checkpoint options too. Current component pins remain strict;
+future provider/Docstruct/runtime changes require compatibility review and a
+revision bump when their behavior changes, not merely a matching PDDL hash.
+
+For rollback to 0.3.29, restore the matching Core/SDK environment and restart
+from source with old checkpoints cleared (especially unstamped ones); do not
+submit an already processed canonical document as source. The new provider key
+makes stamped new checkpoints incompatible with the old identity too. The
+separate #943 also proposes Core 0.3.30 and is still open; no conflicting Core
+0.3.30 release was published when reviewed. Both may share one unpublished
+release; the second merge must reconcile changelogs/locks and bump if the first
+implementation has already been published. The domain bundle stays unchanged.
+
+Cancellation remains cooperative. A deterministic job/queue test pauses after
+the last validated response but before handler acceptance. `run_blocking` joins
+the active worker: it may finish and checkpoint the entire step while the job
+is cancelling. The service suppresses exports/token publication, marks the job
+cancelled and clears its checkpoints. This promises neither rollback of the
+in-memory step nor rollback of remote writes. The existing resume test proves
+that a retained committed step is not normalized twice.
+
 ## Evidence and local qualification
 
 Frozen original-handler observations cover mixed, empty and protected/no-op
@@ -96,7 +148,11 @@ and Redis. A 257-target interruption/restart uses the real SQLite operation
 journal and file checkpoints: the first response joins identically with the
 execution cache disabled. Test services are temporary and were stopped.
 
-Three local runs, with an explicit synthetic **5 ms delay per request**, produced
+These measurements characterize initial consumer commit `5c31545c`, before the
+review added direct-constructor validation and deployment-revision binding.
+The review regressions verify correctness; timings are not a new benchmark of
+the revised constructor. Three local runs, with an explicit synthetic
+**5 ms delay per request**, produced
 the following [raw measurements](norm-fix-consumer-measurements.json):
 
 | 64-target mode | Total requests | Median handler latency per run (ms) | Total request-body bytes | Total response-body bytes |

@@ -7,6 +7,10 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Corrigido (revisão da 0.7.1)** A construção direta de `NormalizationBatch`
+  agora valida correspondência canônica de payload/alvos, DTOs estritos, limites
+  e unicidade uma vez, antes de qualquer tentativa HTTP. Listas do chamador são
+  capturadas; retries reutilizam os mesmos bytes imutáveis já validados (#950).
 - **Adicionado (0.7.1)** `ToolboxTextNormalizeClient` para o contrato publicado
   `document.text.normalize@1`, modelos estritos de alvo/resultado gerados,
   lotes imutáveis (256 alvos / 1 MiB UTF-8 serializado), vetores de fingerprint

@@ -4,6 +4,13 @@ Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
 ## 0.3.30 — remote one-pass normalization (#929)
 
+Review follow-up: normalization journal slots also bind endpoints and the
+existing deployment revision (`PROCESSING_MODEL_REVISION` through execution
+checkpoint options). Bump it when provider configuration changes at unchanged
+id/version. Public batch construction, cancellation/publication and legacy
+cache/checkpoint invalidation have dedicated regressions; the consumer report
+documents upgrade/rollback and the frozen domain description as historical (#950).
+
 `norm-fix` now uses `document.text.normalize@1` through SDK 0.7.1, after
 Toolbox #174/#177. The Core preserves target selection, metadata and acceptance;
 requests are bounded by target count and serialized UTF-8 bytes. Strict response

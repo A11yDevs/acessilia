@@ -244,7 +244,7 @@ class Settings:
         default_factory=lambda: os.getenv("INLINE_MATH_DETECTION", "fonts").strip().lower()
     )
 
-    # Bump on remote model deployments that retain the same URL/model name.
+    # Bump on remote model/provider configuration changes retaining URL/id/version.
     processing_model_revision: str = field(
         default_factory=lambda: os.getenv("PROCESSING_MODEL_REVISION", "")
     )

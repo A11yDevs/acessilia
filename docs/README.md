@@ -39,6 +39,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 26. [Baseline variability and exhaustive overlap](testing/variability.md) — the three-run medians and ranges, and the difference between the exhaustive signature subsumption analysis and the capped similarity pair search. (Brazilian Portuguese: [pt-BR version](testing/variability.pt-br.md))
 27. [CI experiment: baseline, parallel and shadow selection](testing/ci-experiment.md) — the first wall-clock and job-minute comparison before and after #762, with the decision to keep the full suite as the gate. (Brazilian Portuguese: [pt-BR version](testing/ci-experiment.pt-br.md))
 28. [Toolbox runtime placement and first migration slices](architecture/toolbox-runtime-placement.md) — the source inventory, library/deployment boundaries and operational migration gates for ADR-0032 (#913). (Brazilian Portuguese: [pt-BR version](architecture/toolbox-runtime-placement.pt-br.md))
+29. [Remote normalization consumer](architecture/norm-fix-consumer.md) — batch invariants, acceptance, recovery, upgrade and measurements for #929. (Brazilian Portuguese: [pt-BR version](architecture/norm-fix-consumer.pt-br.md))
 
 ---
 

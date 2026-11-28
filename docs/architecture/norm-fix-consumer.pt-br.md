@@ -15,8 +15,10 @@ arquivos, conforme a [ADR-0032 aceita](../adr/0032-toolbox-runtime-library-place
 
 O Core seleciona os alvos da obrigação existente em ordem de leitura, decide o
 aceite e atualiza seus metadados. O SDK captura/codifica DTOs delimitados, usa o
-transporte público autenticado e valida observações. Só a Toolbox invoca o
-algoritmo de normalização. `text.postprocess@1` permanece separado, com semântica
+transporte público autenticado e valida observações. Só a Toolbox produz o
+resultado aceito pelo método `norm-fix`. O detector ainda prevê mudanças
+localmente e o wrapper legado de fusão ainda expõe uma ferramenta local;
+remover esse cálculo continua como dívida de migração (#948). `text.postprocess@1` permanece separado, com semântica
 diferente de marcadores/deduplicação.
 
 Alvos vazios/nulos ficam intactos e não exigem requisição. Alvos ausentes, falha
@@ -38,7 +40,10 @@ cache e failover autorizado usam a configuração Toolbox da execução. Não h�
 fila, imagem ou serviço.
 
 Domínio/descrição PDDL distribuídos ficam congelados para preservar hashes dos
-planos salvos. A granularidade existente é preservada: o detector atual emite uma
+planos salvos. A descrição da implementação local de normalização é histórica;
+este relatório descreve o handler remoto atual. O hash do domínio sozinho não
+garante compatibilidade dos checkpoints (veja a política de upgrade abaixo).
+A granularidade existente é preservada: o detector atual emite uma
 obrigação por elemento afetado. Uma obrigação com vários alvos usa lotes
 delimitados; obrigações independentes não são unidas nem antecipadas. A
 [#948](https://github.com/A11yDevs/acessilia/issues/948) avalia essa decisão restante
@@ -46,6 +51,10 @@ de planejamento/desempenho e a retirada da predição local.
 
 ## Vinculação, aceite atômico e recuperação
 
+- A construção pública de `NormalizationBatch` confere correspondência canônica
+  de payload/alvos, tipos, ids, unicidade e limites uma vez, capturando listas do
+  chamador. Retries HTTP reutilizam esses bytes imutáveis validados. A fábrica
+  também preserva unicidade/ordem global ao dividir vários lotes.
 - Cada requisição tem até 256 ids únicos (1–256 caracteres) e **1.048.576 bytes
   UTF-8 serializados**, incluindo envelope, separadores e escapes. Texto/id
   indivisível excessivo é recusado, sem truncar nem repartir o texto entre
@@ -77,6 +86,52 @@ de planejamento/desempenho e a retirada da predição local.
   não significa preempção ou rollback de gravação iniciada em storage/cache.
   Observações inline usam as políticas existentes de storage/cache/retenção.
 
+## Upgrade, rollback e configuração da implantação
+
+Adicionar o provider de normalização muda a chave do cache de processamento e
+cada identidade de estágio dependente da Toolbox, inclusive mídia/extração.
+Um checkpoint com identidade da 0.3.29 sem esse provider é recusado na primeira
+fase alterada; todas as fases posteriores são refeitas desde a origem, nunca
+normalizando novamente o texto processado salvo. Tentativas da versão nova com
+identidade igual reutilizam o passo consolidado; lotes interrompidos preservam
+a entrada original. Checkpoints anteriores às identidades mantêm a política
+existente de aviso e reuso; remova-os antes de upgrade/rollback se a
+compatibilidade for desconhecida. Um miss deixa a entrada antiga do cache
+sujeita à expiração normal; não é uma limpeza do cache.
+
+O id/versão de um provider não revela sua configuração privada. Antes de mudar
+configuração do provider, pesos ou comportamento de algoritmo/runtime no mesmo
+endpoint/id/versão, **incremente `PROCESSING_MODEL_REVISION`**. O serviço já o
+inclui na identidade do cache e nas opções dos checkpoints de enriquecimento e
+execução. A normalização agora também vincula essa revisão, os endpoints e o
+lote original ao slot do diário. Assim o id muda, evitando repetir indefinidamente
+um id que a Toolbox recusa como requisição diferente. Revisões iguais preservam
+as tentativas; não há detecção automática da configuração privada. Um conflito
+continua sendo falha explícita e permanente, sem rotação cega de id/retry que
+possa ocultar trabalho alterado. Hosts de biblioteca que preservam diários também
+devem fornecer sua revisão de implantação nas opções existentes do checkpoint
+de execução. Os pins de componentes continuam estritos; mudanças futuras de
+provider/Docstruct/runtime exigem revisão de compatibilidade e incremento da
+revisão quando alterarem comportamento, além de conferir o hash PDDL.
+
+Para voltar à 0.3.29, restaure o ambiente Core/SDK correspondente e reinicie da
+origem com checkpoints antigos removidos, especialmente os sem identidade; não
+use um documento canônico já processado como origem. A nova chave de provider
+também torna checkpoints novos com identidade incompatíveis com a versão antiga.
+O #943 separado também propõe Core 0.3.30 e continua aberto; nenhuma release Core
+0.3.30 conflitante havia sido publicada na revisão. Ambos podem integrar uma
+release ainda não publicada; o segundo merge deve reconciliar changelogs/locks
+e incrementar a versão se a primeira implementação já tiver sido publicada.
+O bundle do domínio permanece igual.
+
+O cancelamento continua cooperativo. Um teste determinístico do job/fila pausa
+após a última resposta validada e antes do aceite do handler. `run_blocking`
+aguarda a thread ativa: ela pode concluir e salvar o passo inteiro durante o
+cancelamento. O serviço impede exports/publicação de token, marca o job como
+cancelado e limpa seus checkpoints. Isso não promete rollback do passo em memória
+nem de escritas remotas. O teste existente de retomada comprova que um passo
+consolidado e preservado não é normalizado duas vezes.
+
 ## Evidências e qualificação local
 
 Observações congeladas do handler original cobrem alvos mistos, vazios e
@@ -96,7 +151,10 @@ reinício com 257 alvos usa diário SQLite e checkpoints por arquivo reais: a
 primeira resposta é recuperada identicamente com cache de execução desligado.
 Os serviços de teste eram temporários e foram encerrados.
 
-Três rodadas locais, com atraso sintético explícito de **5 ms por requisição**,
+Estas medidas caracterizam o commit inicial do consumidor `5c31545c`, antes da
+validação de construção direta e do vínculo à revisão de implantação. As
+regressões da revisão verificam correção; os tempos não são um novo benchmark
+do construtor revisado. Três rodadas locais, com atraso sintético explícito de **5 ms por requisição**,
 produziram estas [medidas brutas](norm-fix-consumer-measurements.json):
 
 | Modo com 64 alvos | Total de requisições | Mediana por execução do handler (ms) | Bytes totais do corpo enviado | Bytes totais do corpo recebido |

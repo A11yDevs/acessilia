@@ -64,7 +64,7 @@ def _context(manifest: ProcessingManifest, obligation_id: str) -> _Context:
     )
 
 
-def _scope(context: _Context, config: CoreConfig) -> str:
+def _scope(context: _Context, config: CoreConfig, ports: RunPorts) -> str:
     """A journal slot's semantic context; attempt bookkeeping is not input."""
     return fingerprint(
         canonical_json(
@@ -96,6 +96,13 @@ def _scope(context: _Context, config: CoreConfig) -> str:
                 )
                 or provider_default("toolbox_text_normalize_provider"),
                 "no_cache": not config.toolbox.use_remote_cache,
+                "deployment": {
+                    "base_url": config.toolbox.base_url,
+                    "base_urls": config.toolbox.base_urls,
+                    "revision": getattr(ports.checkpoints, "options", {})
+                    .get("execution", {})
+                    .get("processing_model_revision", ""),
+                },
             }
         )
     )
@@ -161,7 +168,7 @@ def _handle_norm_fix_method(
     try:
         batches = normalization_batches(targets)
         observations = run_sync(
-            _observe(batches, _scope(before, config), config=config, ports=ports)
+            _observe(batches, _scope(before, config, ports), config=config, ports=ports)
         )
     except (ToolboxError, ValueError) as exc:
         logger.warning("Text normalization refused: {}", exc)

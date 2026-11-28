@@ -44,6 +44,7 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 28. [Variabilidade do baseline e sobreposição exaustiva](testing/variability.pt-br.md) — as medianas e faixas de três execuções e a diferença entre a análise exaustiva de subsunção por assinatura e a busca de similaridade limitada por cap. (English: [English version](testing/variability.md))
 29. [Experimento de CI: baseline, paralelo e seleção em observação](testing/ci-experiment.pt-br.md) — a primeira comparação de tempo de parede e job-minutes antes e depois da #762, com a decisão de manter a suíte completa como gate. (English: [English version](testing/ci-experiment.md))
 30. [Localização do runtime da Toolbox e primeiras fatias de migração](architecture/toolbox-runtime-placement.pt-br.md) — o inventário de fontes, as fronteiras de bibliotecas/implantação e os critérios de migração operacional da ADR-0032 (#913). (English: [English version](architecture/toolbox-runtime-placement.md))
+31. [Consumidor remoto de normalização](architecture/norm-fix-consumer.pt-br.md) — invariantes dos lotes, aceite, retomada, upgrade e medições da #929. (English: [English version](architecture/norm-fix-consumer.md))
 
 ---
 

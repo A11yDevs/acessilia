@@ -7,6 +7,10 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Fixed (0.7.1 review)** Direct `NormalizationBatch` construction now validates
+  canonical payload/target agreement, strict DTOs, limits and uniqueness once,
+  before any HTTP attempt. Caller lists are snapshotted; retries reuse the same
+  validated immutable bytes (#950).
 - **Added (0.7.1)** `ToolboxTextNormalizeClient` for the published
   `document.text.normalize@1` contract, generated strict target/result models,
   immutable request batches (256 targets / 1 MiB serialized UTF-8), shared
