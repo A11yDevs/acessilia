@@ -255,6 +255,22 @@ def restored_admission_deferred_ids(payload: dict[str, Any]) -> tuple[str, ...]:
     return tuple(item for item in raw if isinstance(item, str))
 
 
+def load_execution_state(
+    checkpoints: RunCheckpoints, plan: NominalPlan
+) -> dict[str, Any] | None:
+    """The execution checkpoint of ``plan``, ``None`` when it belongs to another plan.
+
+    A checkpoint from another plan is loaded but not accepted as provenance:
+    its progress does not apply to the new plan and it is not reused.
+    """
+    execution_state = checkpoints.load(PHASE_EXECUTION)
+    if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
+        return None
+    if execution_state is not None:
+        checkpoints.accept(PHASE_EXECUTION)
+    return execution_state
+
+
 def resumed_manifest(execution_state: dict[str, Any], plan: NominalPlan) -> dict[str, Any]:
     """The manifest a resumed execution starts from (#836).
 
@@ -382,6 +398,7 @@ __all__ = [
     "PHASE_STAGES",
     "RunCheckpoints",
     "manifest_payload",
+    "load_execution_state",
     "restored_admission_deferred_ids",
     "resumed_manifest",
 ]

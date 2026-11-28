@@ -49,6 +49,7 @@ from acessilia_core.manifest.models import (
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import (
     RunCheckpoints,
+    load_execution_state,
     manifest_payload,
     restored_admission_deferred_ids,
     resumed_manifest,
@@ -369,7 +370,7 @@ class PddlAccessibilityOrchestrator:
         )
         planning = await self._load_or_build_plan(ctx, manifest)
 
-        execution_state = self._load_execution_state(ctx.checkpoints, planning.plan)
+        execution_state = load_execution_state(ctx.checkpoints, planning.plan)
         if status_callback and execution_state is None:
             await status_callback(
                 t(STAGE_VALIDATING_PLAN_DRY_RUN)
@@ -562,21 +563,6 @@ class PddlAccessibilityOrchestrator:
             gated=gated,
             replans=0,
         )
-
-    @staticmethod
-    def _load_execution_state(
-        checkpoints: RunCheckpoints, plan: NominalPlan
-    ) -> dict[str, Any] | None:
-        """The execution checkpoint of ``plan``, ``None`` when it belongs to another plan."""
-        execution_state = checkpoints.load(PHASE_EXECUTION)
-        if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
-            # The plan checkpoint was replaced after this execution checkpoint
-            # was written (a replan that crashed before it started). The old
-            # progress does not apply to the new plan.
-            return None
-        if execution_state is not None:
-            checkpoints.accept(PHASE_EXECUTION)
-        return execution_state
 
     async def _run_plan(
         self,

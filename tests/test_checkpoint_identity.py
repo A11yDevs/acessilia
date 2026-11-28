@@ -21,6 +21,7 @@ from acessilia_core.pipeline.checkpointing import (
     IDENTITY_KEY,
     PHASE_STAGES,
     RunCheckpoints,
+    load_execution_state,
     manifest_payload,
 )
 from acessilia_core.pipeline.handlers import (
@@ -523,7 +524,7 @@ def test_an_execution_checkpoint_from_another_plan_is_not_reused() -> None:
     reader = RunCheckpoints(store, config, outcome=outcome)
     plan = SimpleNamespace(plan_id="current-plan")
 
-    assert pddl.PddlAccessibilityOrchestrator._load_execution_state(reader, plan) is None
+    assert load_execution_state(reader, plan) is None
     assert outcome.reused_phases == []
 
 
@@ -540,5 +541,5 @@ def test_a_matching_execution_checkpoint_is_reused() -> None:
     reader = RunCheckpoints(store, config, outcome=outcome)
     plan = SimpleNamespace(plan_id="current-plan")
 
-    assert pddl.PddlAccessibilityOrchestrator._load_execution_state(reader, plan) == payload
+    assert load_execution_state(reader, plan) == payload
     assert outcome.reused_phases == [PHASE_EXECUTION]
