@@ -53,11 +53,11 @@ before each replan (#832):
   it. A future step that must run *before* it is not one this rule should
   order: it needs an exclusion here.
 
-  Between the document's steps, the policy is explicit (#845 review): two
-  steps share elements only when the first must run before the second, and
-  ``DOCUMENT_STEPS`` lists them in that order. The rule follows it: a step's
-  obligation may depend on an earlier step's that shares an element, never
-  on a later one's, so it can never make a cycle between them. Today the
+  Between document steps, shared targets alone do not establish causality:
+  the dependent declares ``predecessors`` (#865). The predecessor must be
+  registered earlier in ``DOCUMENT_STEPS``, and an edge requires shared
+  targets. Registry order validates the declarations, without creating
+  additional edges. Today the
   formula region classification and the formula LaTeX share the formulas
   (M4: the recognition waits for the classification); the inline math
   (M4b) shares a paragraph with the descriptions (in a mostly visual
@@ -148,6 +148,12 @@ class DocumentStep:
     #: that waited for it are planned without it (M4b: a formula conversion
     #: reads fewer variables, as with the detection off).
     critical: bool = True
+    #: Causal document-step predecessors, linked only for shared targets.
+    #: Registry order checks the declaration; it never implies a dependency.
+    predecessors: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "predecessors", tuple(self.predecessors))
 
 
 def _pictures_pending(manifest: ProcessingManifest) -> list[str]:
@@ -202,6 +208,7 @@ FORMULA_RECOGNITION = DocumentStep(
     rationale=MSG_OBLIGATION_FORMULA_RECOGNITION,
     applies=lambda element: element.type == "formula",
     pending=formulas_to_recognize,
+    predecessors=("classify-formula-regions",),
 )
 
 #: The document's formula region classification (M4a): the formulas without
@@ -235,16 +242,14 @@ INLINE_MATH = DocumentStep(
     waiting_kinds=frozenset({"verbalize-formula", "normalize-formula"}),
     renewed=inline_math_renewed,
     critical=False,
+    predecessors=("describe-images", "enrich-tables"),
 )
 
 #: The formula region classification, the descriptions (which can find
 #: formulas), the formula LaTeX, the tables, then the prose's inline math.
-#: Two steps share elements only when the first must run before the second:
-#: the classification, then the formula LaTeX, on a formula; the
-#: descriptions, then the inline math, on a paragraph of a mostly visual
-#: document; the table enrichment, then the inline math, on a table whose
-#: marks went stale. This order makes those dependencies, and never the
-#: reverse.
+#: Declared predecessors must appear first. Registration order is only the
+#: reconciliation order: edges require a predecessor declaration and shared
+#: targets, so unrelated steps remain unordered even when targets overlap.
 DOCUMENT_STEPS: tuple[DocumentStep, ...] = (
     FORMULA_CLASSIFICATION,
     PICTURE_DESCRIPTION,
@@ -252,6 +257,23 @@ DOCUMENT_STEPS: tuple[DocumentStep, ...] = (
     TABLE_ENRICHMENT,
     INLINE_MATH,
 )
+
+
+def _validate_document_steps(steps: tuple[DocumentStep, ...]) -> None:
+    """Reject ambiguous or forward/unknown causal declarations before mutation."""
+    seen: set[str] = set()
+    for step in steps:
+        if step.kind in seen:
+            raise ValueError(f"Duplicate document step kind: {step.kind}")
+        if len(set(step.predecessors)) != len(step.predecessors):
+            raise ValueError(f"Duplicate predecessors for document step: {step.kind}")
+        missing = set(step.predecessors) - seen
+        if missing:
+            raise ValueError(
+                f"Document step {step.kind} requires earlier predecessors: "
+                + ", ".join(sorted(missing))
+            )
+        seen.add(step.kind)
 
 
 def reconcile_document_step(
@@ -266,6 +288,7 @@ def reconcile_document_step(
     Idempotent. Returns the obligation of the newest elements, or the first
     one when nothing changed; ``None`` when the step has none.
     """
+    _validate_document_steps(DOCUMENT_STEPS)
     _drop_lost(manifest, step)
     own = [item for item in manifest.obligations if item.kind == step.kind]
     renewed = step.renewed(manifest) if step.renewed is not None else set()
@@ -286,8 +309,8 @@ def reconcile_document_steps(manifest: ProcessingManifest, *, replan: bool = Fal
     """:func:`reconcile_document_step` for every step of ``DOCUMENT_STEPS``.
 
     The edges are reconciled once more after every step's obligations exist:
-    a step's pass links the obligations that exist then, so when two steps
-    share an element (M4), the later step's obligation, created in its own
+    a step's pass links the obligations that exist then, so when a declared
+    dependent shares an element (M4), its obligation, created in its own
     pass, would otherwise wait for the next reconciliation to depend on the
     earlier one, and the first plan could run them in either order."""
     for step in DOCUMENT_STEPS:
@@ -372,14 +395,14 @@ def _reconcile_edges(manifest: ProcessingManifest, step: DocumentStep) -> None:
     a closed one is history only while the element that justified it stays,
     and an edge to a ``failed`` one would block the dependent from being
     replanned at all. A closed dependent is not planned again, so it is left
-    as it is, and so are the obligations of this step and of the earlier
-    ones of ``DOCUMENT_STEPS`` (the module docstring). An edge to an
+    as it is, and so are the obligations of this step. Other document steps
+    require a declared predecessor, rather than an earlier registry position.
+    An edge to an
     exhausted obligation of a non-critical step goes even while the element
     stays (``_release_exhausted``, run before this rule, which never adds
     one back: it links open obligations only).
     """
-    order = [item.kind for item in DOCUMENT_STEPS]
-    skipped = set(order[: order.index(step.kind) + 1]) if step.kind in order else {step.kind}
+    steps = {item.kind: item for item in DOCUMENT_STEPS}
     own = {item.id: set(item.target_ids) for item in manifest.obligations if item.kind == step.kind}
     open_own = {
         item.id: set(item.target_ids)
@@ -387,19 +410,34 @@ def _reconcile_edges(manifest: ProcessingManifest, step: DocumentStep) -> None:
         if item.kind == step.kind and item.status not in CLOSED_STATUSES
     }
     for item in manifest.obligations:
-        if item.kind in skipped or item.status in CLOSED_STATUSES:
+        if item.kind == step.kind or item.status in CLOSED_STATUSES:
             continue
-        targets = set(item.target_ids)
-        waits = item.kind in step.waiting_kinds
-        kept = [
-            dependency for dependency in item.dependencies
-            if dependency not in own or waits or own[dependency] & targets
-        ]
-        needed = [
-            obligation for obligation, elements in open_own.items()
-            if (waits or elements & targets) and obligation not in kept
-        ]
-        item.dependencies = kept + needed
+        item.dependencies = _step_dependencies(item, step, own, open_own, steps)
+
+
+def _step_dependencies(
+    item: Obligation,
+    step: DocumentStep,
+    own: dict[str, set[str]],
+    open_own: dict[str, set[str]],
+    steps: dict[str, DocumentStep],
+) -> list[str]:
+    dependent = steps.get(item.kind)
+    if dependent is not None and step.kind not in dependent.predecessors:
+        return [dependency for dependency in item.dependencies if dependency not in own]
+    targets = set(item.target_ids)
+    # Cross-target waiting is for ordinary obligations (formula conversions),
+    # not an implicit predecessor declaration for another document step.
+    waits = dependent is None and item.kind in step.waiting_kinds
+    kept = [
+        dependency for dependency in item.dependencies
+        if dependency not in own or waits or own[dependency] & targets
+    ]
+    needed = [
+        obligation for obligation, elements in open_own.items()
+        if (waits or elements & targets) and obligation not in kept
+    ]
+    return kept + needed
 
 
 def _release_exhausted(manifest: ProcessingManifest, step: DocumentStep) -> None:

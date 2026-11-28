@@ -354,8 +354,8 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    do plano. Ela compartilha as fórmulas com o LaTeX das fórmulas, que deve
    vir depois dela (a classificação decide se uma região é matemática),
    então `recognize-formulas` depende de `classify-formula-regions` nas
-   fórmulas que eles compartilham: `DOCUMENT_STEPS` lista a classificação
-   primeiro, e a regra de arestas o segue. Um elemento que as descrições
+   fórmulas que eles compartilham: o reconhecimento declara a classificação
+   como predecessor; a ordem do registro valida a declaração. Um elemento que as descrições
    transformaram em fórmula (uma imagem ou um visual substituto) não é
    classificado: as descrições rodavam depois da classificação antes do
    planejamento, então ele nunca era, e uma segunda resposta poderia
@@ -370,8 +370,8 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    como a obrigação do documento `mark-inline-math`. As conversões de fórmula
    (`verbalize-formula`, `normalize-formula`) leem as variáveis que suas
    marcas dão, então esperam por ela embora não compartilhem elemento: o
-   passo as declara como `waiting_kinds`, uma dependência declarada mínima (a
-   #865 propõe predecessores em geral). Ela compartilha um parágrafo com as
+   passo as declara como `waiting_kinds`, uma dependência explícita de informação
+   de escopo de documento, junto aos seus `predecessors` por alvo comum (#865). Ela compartilha um parágrafo com as
    descrições (um documento majoritariamente visual) e uma tabela obsoleta
    com o enriquecimento de tabelas, e vem depois dos dois. Ela não chama
    modelo, então o breaker de visão não a ordena; os passos que compartilham
@@ -526,21 +526,39 @@ nunca pega um elemento que depois deixaria de lado. Uma fórmula ou uma
 tabela, que a alternativa de uma página pegava, fica para os seus próprios
 passos e nunca é retipada como imagem.
 
-**Entre os passos** a política é explícita: dois passos só compartilham
-elementos quando o primeiro precisa rodar antes do segundo, e
-`DOCUMENT_STEPS` os lista nessa ordem; as arestas a seguem (a obrigação de
-um passo pode depender da de um passo anterior que compartilha um elemento,
-nunca da de um posterior), então nunca fazem ciclo. Antes da revisão da
-#845 as descrições e as tabelas podiam compartilhar a tabela de um documento
-de uma página, e a regra de alvos, aplicada por cada passo, fazia um
-depender do outro. Hoje a classificação de regiões de fórmula e o LaTeX das
-fórmulas compartilham fórmulas (M4a), e a matemática inline compartilha um
-parágrafo com as descrições e uma tabela obsoleta com o enriquecimento de
-tabelas (M4b); em cada par o primeiro roda antes. Além dos alvos, um passo
-pode declarar `waiting_kinds`: kinds de obrigação que esperam por ele quais
-forem seus alvos (M4b: as conversões de fórmula). As arestas são reconciliadas mais
-uma vez depois que as obrigações de todos os passos existem, então o
-primeiro plano já ordena dois passos que compartilham um elemento.
+**Entre passos de documento**, `DocumentStep.predecessors` declara as relações
+causais (#865). Uma aresta exige tanto a declaração no dependente quanto alvos
+compartilhados. `DOCUMENT_STEPS` é a ordem de reconciliação e verifica que o
+predecessor declarado venha antes; a posição no registro e o breaker de visão
+compartilhado, sozinhos, nunca criam arestas. Kinds/predecessores duplicados e
+declarações desconhecidas, futuras, próprias ou cíclicas falham antes de qualquer
+mutação do manifesto. A segunda passagem de arestas permanece necessária para
+que o primeiro plano já veja os pares declarados.
+
+| Consumidor | Predecessor / fonte de informação | Escopo | Política de esgotamento |
+|---|---|---|---|
+| `recognize-formulas` | `classify-formula-regions` | alvos compartilhados | dependência continua obrigatória |
+| `mark-inline-math` | `describe-images` | alvos compartilhados | dependência continua obrigatória pela política existente do passo |
+| `mark-inline-math` | `enrich-tables` | alvos compartilhados | dependência continua obrigatória |
+| `verbalize-formula`, `normalize-formula` | `mark-inline-math` | documento (`waiting_kinds`) | admite degradação: `critical=False` libera arestas esgotadas |
+
+Essas declarações preservam os fluxos reais atuais. Passos independentes podem
+compartilhar alvos sem ganhar dependência; a sobreposição sintética histórica
+entre descrições e tabelas agora fica sem aresta nos dois sentidos. Obrigações
+ordinárias de elemento/página mantêm a regra por alvos e as dependências de
+informação explícitas em `waiting_kinds`. Essas esperas sem alvo comum não
+declaram implicitamente predecessores entre passos de documento. Arestas abertas
+para produtores sem alvo comum são removidas; obrigações dependentes fechadas
+preservam seu grafo histórico. `critical` ainda controla o esgotamento das arestas
+geridas de saída do produtor nos dois escopos, sem nova política por aresta ou
+condicional ao manifesto. A criticidade das descrições para entrega, em
+particular, não é redesenhada aqui.
+
+Esta declaração do contrato atual de coordenação Python prepara o batching
+seguro (#948) e o trabalho de domínio causal (#934); as relações ainda não foram
+transferidas ao PDDL. O bundle/hashes do domínio publicado e os checkpoints de
+planos aceitos permanecem iguais. Mudar só esta regra não exige regravar
+harness/referências se a saída canônica histórica permanecer equivalente.
 
 **O plano decide os alvos.** O método descreve os alvos da sua obrigação
 que ainda são descritíveis e não estão descritos, sejam quais forem os

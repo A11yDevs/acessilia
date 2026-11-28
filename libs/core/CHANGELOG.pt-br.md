@@ -2,6 +2,17 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.34 — predecessores explícitos entre passos de documento (#865)
+
+Passos de documento declaram seus predecessores causais por alvos comuns. A
+ordem de registro valida essas declarações sem criar dependências por si só.
+O reconhecimento de fórmulas declara a classificação; matemática inline declara
+as descrições de imagens e o enriquecimento de tabelas. Registros inválidos
+falham antes de alterar o manifesto. Obrigações ordinárias, esperas de informação
+de escopo de documento, esgotamento, histórico fechado, validação do DAG e segunda
+passagem de arestas são preservados. Bundle do domínio e hashes de planos salvos
+permanecem iguais. Isso prepara #948/#934; a composição ainda não saiu do Python.
+
 ## 0.3.33 — validar ordem dos passos retomados antes da proveniência (#960)
 
 O aceite de checkpoints de execução também reutiliza as verificações existentes
