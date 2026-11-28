@@ -486,6 +486,8 @@ class JobExecutor:
     ) -> None:
         """Fill the attempt's result from the run outcome (#944), best effort."""
         if attempt_id is None:
+            if state == "completed":
+                await _persist_status(task_id)
             return
         try:
             await run_blocking(
@@ -496,6 +498,7 @@ class JobExecutor:
                 origin=outcome.result_origin,
                 reused_phases=outcome.reused_phases,
                 error_type=error_type,
+                published_status=get_job_status(task_id) if state == "completed" else None,
             )
         except Exception as exc:  # noqa: BLE001 - the audit result is best-effort
             logger.warning(
@@ -503,6 +506,8 @@ class JobExecutor:
                 task_id,
                 type(exc).__name__,
             )
+            if state == "completed":
+                await _persist_status(task_id)
 
     async def _prepare_run(
         self, task_id: str, job: ApiJob, *, resumed: bool
@@ -765,7 +770,6 @@ class JobExecutor:
             await self._finish_attempt(
                 task_id, attempt_id, state="completed", outcome=outcome
             )
-            await run_blocking(save_status, task_id, get_job_status(task_id))
             await finalizar_conversao(
                 task_id=task_id,
                 status="done",
@@ -796,6 +800,9 @@ class JobExecutor:
             )
 
         except (TaskCancelledError, asyncio.CancelledError):
+            if result_published:
+                state_manager.atualizar(task_id, email_delivery="unknown" if job.email else None)
+                return
             if shutdown.shutting_down():
                 # The queue worker stops the callback on a normal restart. Keep
                 # the durable record, upload and checkpoints so the next startup
@@ -808,9 +815,6 @@ class JobExecutor:
                     "Job {}: service shutdown; keeping it resumable", task_id
                 )
                 raise
-            if result_published:
-                state_manager.atualizar(task_id, email_delivery="unknown" if job.email else None)
-                return
             state_manager.atualizar(task_id, status="cancelled", etapa=t(STAGE_CANCELLED_BY_USER))
             await self._finish_attempt(
                 task_id, attempt_id, state="cancelled", outcome=outcome

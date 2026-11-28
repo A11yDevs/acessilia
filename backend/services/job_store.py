@@ -110,6 +110,9 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
                 if "duplicate column" not in str(exc).lower():
                     raise
         _migrate_legacy_configurations(conn)
+        # Migration writes must finish before a consumer starts its own read
+        # transaction or raises. A failed commit must leave this path retryable.
+        conn.commit()
         _migrated.add(key)
 
 
@@ -174,9 +177,7 @@ ATTEMPT_STATES: frozenset[str] = frozenset(
 )
 
 #: Valid result origins. ``unknown`` is evidence-free, never a guess (#944).
-ATTEMPT_ORIGINS: frozenset[str] = frozenset(
-    {"produced", "cache", "resumed", "unknown"}
-)
+ATTEMPT_ORIGINS: frozenset[str] = frozenset({"produced", "cache", "resumed", "unknown"})
 
 
 def save_attempt_start(
@@ -225,17 +226,14 @@ def save_configuration(task_id: str, configuration: dict[str, Any]) -> None:
         task_id,
         {
             "id": attempt.get("id") or uuid.uuid4().hex,
-            "captured_at": attempt.get("captured_at")
-            or datetime.now(UTC).isoformat(),
+            "captured_at": attempt.get("captured_at") or datetime.now(UTC).isoformat(),
             "resumed": bool(attempt.get("resumed", False)),
         },
         configuration,
     )
 
 
-def save_attempt_marker(
-    task_id: str, attempt_id: str, captured_at: str
-) -> bool:
+def save_attempt_marker(task_id: str, attempt_id: str, captured_at: str) -> bool:
     """Write the current-attempt marker into the durable status (#944).
 
     A dedicated operation instead of ``save_status``: it detects a job row
@@ -282,16 +280,23 @@ def save_attempt_result(
     origin: str,
     reused_phases: list[str] | None = None,
     error_type: str | None = None,
+    published_status: dict[str, Any] | None = None,
 ) -> None:
     """Fill an attempt's result once, without touching its configuration (#944).
 
     ``state`` and ``origin`` are validated; ``error_type`` is the exception
     class name, never its message, so no user content reaches the audit.
+    After publication, store the completed attempt and job status in the same
+    transaction: recovery must not see completion paired with a pending job.
     """
     if state not in ATTEMPT_STATES or state in {"started", "legacy"}:
         raise ValueError(f"invalid terminal attempt state: {state!r}")
     if origin not in ATTEMPT_ORIGINS:
         raise ValueError(f"invalid attempt origin: {origin!r}")
+    if published_status is not None and (
+        state != "completed" or published_status.get("status") != "done"
+    ):
+        raise ValueError("publication requires a completed attempt and done job")
     with connection() as conn:
         updated = conn.execute(
             "UPDATE job_attempts SET state=?, origin=?, reused_phases=?, "
@@ -300,13 +305,17 @@ def save_attempt_result(
             (
                 state,
                 origin,
-                json.dumps(list(dict.fromkeys(reused_phases or [])), ensure_ascii=False),
+                json.dumps(
+                    list(dict.fromkeys(reused_phases or [])), ensure_ascii=False
+                ),
                 error_type,
                 time.time(),
                 task_id,
                 attempt_id,
             ),
         ).rowcount
+        if published_status is not None:
+            _save_status(conn, task_id, published_status)
     if updated == 0:
         raise LookupError("no started attempt to finish")
 
@@ -389,20 +398,31 @@ def _record_from_row(row: sqlite3.Row) -> dict[str, Any]:
 
 
 def save_status(task_id: str, status: dict) -> None:
+    with connection() as conn:
+        _save_status(conn, task_id, status)
+
+
+def _save_status(conn: sqlite3.Connection, task_id: str, status: dict) -> None:
     # ``resultado`` and the effective configuration live outside the status:
-    # one is the job's result, the other is written once by
-    # ``save_configuration`` (#380).
+    # one is the job's result, the other is snapshotted per attempt by
+    # ``save_attempt_start``; save_configuration is a compatibility wrapper.
     status = {
         key: value
         for key, value in status.items()
         if key not in {"resultado", "configuracao_efetiva"}
     }
     destination = status.get("status")
-    if destination not in {"queued", "processing", "cancelling", "cancelled", "done", "error"}:
+    if destination not in {
+        "queued",
+        "processing",
+        "cancelling",
+        "cancelled",
+        "done",
+        "error",
+    }:
         raise ValueError("A valid job status is required")
-    with connection() as conn:
-        conn.execute(
-            """UPDATE api_jobs SET status=? WHERE task_id=?
+    conn.execute(
+        """UPDATE api_jobs SET status=? WHERE task_id=?
                AND NOT (
                    COALESCE(json_extract(status, '$.status'), '') IN ('done', 'error', 'cancelled')
                    AND ? IN ('queued', 'processing', 'cancelling')
@@ -413,13 +433,16 @@ def save_status(task_id: str, status: dict) -> None:
                    COALESCE(json_extract(status, '$.status'), '') = 'cancelled'
                    AND ? != 'cancelled'
                )""",
-            (json.dumps(status), task_id, destination, destination, destination),
-        )
+        (json.dumps(status), task_id, destination, destination, destination),
+    )
 
 
 def pending_records() -> list[dict[str, Any]]:
     with connection() as conn:
-        ids = [row[0] for row in conn.execute("SELECT task_id FROM api_jobs ORDER BY rowid")]
+        ids = [
+            row[0]
+            for row in conn.execute("SELECT task_id FROM api_jobs ORDER BY rowid")
+        ]
     return [
         record
         for task_id in ids

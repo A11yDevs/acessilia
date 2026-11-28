@@ -266,8 +266,8 @@ def load_execution_state(
     execution_state = checkpoints.load(PHASE_EXECUTION)
     if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
         return None
-    if execution_state is not None:
-        checkpoints.accept(PHASE_EXECUTION)
+    # Matching the plan is only a precondition: _run_plan validates the manifest
+    # and results and accepts this payload after constructing ExecutionResume.
     return execution_state
 
 

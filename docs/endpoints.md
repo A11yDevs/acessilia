@@ -60,6 +60,29 @@ Observations:
 - The `pipeline` field in history records the AI client and the engine that ran the job, as `<ai_client>-<engine>` (for example `ollama-pddl`). The engine is `pddl` for every current job, although jobs submitted through the API record the raw `PIPELINE_ENGINE` value, so the `pmv` alias shows up as `ollama-pmv`; `legacy` appears only in records from before that engine was disabled (see `PIPELINE_ENGINE` in [architecture.md](architecture.md)).
 - Standard interactive FastAPI docs at `GET /docs` and `GET /openapi.json`.
 
+**Storage and recovery boundaries:** The additive SQLite migration, including
+preservation of the original #942 configuration JSON, commits under the migration
+lock before a connection is handed to a reader/writer. Its process-local success
+marker is set only after commit; failure remains retryable. An audit read starts
+its own independent consistent read transaction. Checkpoint provenance is marked
+only after the actual payload is adopted: execution requires successful
+`ProcessingManifest`/`ExecutionStepResult` validation and `ExecutionResume`
+construction, not merely a matching plan id. Media configuration conversion must
+succeed too.
+
+After download publication, the completed attempt and `done` job status (including
+the download link) share one SQLite transaction. Graceful shutdown after that
+boundary keeps the published output and terminal status, rather than turning it
+into resumable work. Audit failure or a missing attempt snapshot falls back to
+best-effort terminal-status persistence; neither may delete a published result.
+An abrupt crash before terminal status is durably committed remains indeterminate:
+recovery follows the existing checkpoint/resubmission policy. A completed audit
+row alone never proves a valid delivered file/token; old inconsistent rows do not
+cause recovery to invent a download or overwrite a terminal attempt. This is not
+a transaction across SQLite, filesystem, download service and email, nor an
+exactly-once delivery guarantee. Producer identity and operational retention
+remain separate work in #957 and #958.
+
 ### Job access, processing options and recovery
 
 - `POST /api/v1/jobs` accepts submissions without login and returns `job_token` alongside `task_id`/`position`. Keep this token: `GET /api/v1/jobs/{task_id}` and `POST /api/v1/jobs/{task_id}/cancel` require `X-Job-Token: <job_token>`. Missing/incorrect credentials return 404 without disclosing job existence. Jobs without a saved authorization credential cannot be accessed; resubmit the document if its job token is unavailable.

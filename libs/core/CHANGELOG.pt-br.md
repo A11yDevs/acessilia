@@ -2,6 +2,16 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.32 — evidência de reuso de checkpoints aceitos (#944, #951)
+
+`RunOutcome` expõe ao host a origem canônica observada e as fases de checkpoint
+aceitas, sem persistência nem dependências do serviço. Carregar um checkpoint de
+execução compatível não é reuso: o orquestrador só o marca depois de validar seu
+manifesto/resultados e construir `ExecutionResume`. Configuração de mídia inválida
+também é recusada antes de registrar proveniência. Checkpoints legados aceitos
+mantêm a política existente de compatibilidade e são registrados uma única vez.
+SDK, contratos da Toolbox e domínio PDDL permanecem iguais.
+
 ## 0.3.31 — normalização remota em uma passagem (#929)
 
 Após revisão: slots do diário de normalização também vinculam endpoints e a

@@ -320,3 +320,81 @@ def test_the_attempt_marker_survives_later_status_writes(tmp_path, monkeypatch) 
     persisted = job_store.load_record("attempt-job")["status"]
     assert persisted["current_attempt_id"] == "attempt-a"
     assert persisted["current_attempt_captured_at"] == "2026-11-27T10:00:00+00:00"
+
+
+@pytest.fixture
+def legacy_audit_database(tmp_path, monkeypatch):
+    """A five-column #942 database, before any job_store connection opens it."""
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    original = ' {"schema": "acessilia/effective-configuration@2", "attempt": {"id": "legacy-a"}} '
+    with sqlite3.connect(settings.db_path) as conn:
+        conn.execute(
+            "CREATE TABLE api_jobs (task_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, "
+            "request TEXT NOT NULL, status TEXT NOT NULL, configuration TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO api_jobs VALUES (?, ?, ?, ?, ?)",
+            ("legacy-job", "hash", "{}", '{"status":"processing"}', original),
+        )
+    return original
+
+
+def test_first_legacy_audit_read_commits_migration_before_its_read_transaction(
+    legacy_audit_database,
+):
+    record, attempts = job_store.load_audit_view("legacy-job")
+    assert record["current_attempt_id"] == "legacy-a"
+    assert attempts[0]["state"] == "legacy"
+    assert attempts[0]["configuration"] == json.loads(legacy_audit_database)
+    job_store.save_attempt_start(
+        "legacy-job", _attempt("new-b", "2026-11-28T10:00:00+00:00"), _configuration("new-b")
+    )
+    _, attempts = job_store.load_audit_view("legacy-job")
+    assert [item["attempt_id"] for item in attempts] == ["legacy-a", "new-b"]
+    with sqlite3.connect(settings.db_path) as conn:
+        assert conn.execute(
+            "SELECT configuration FROM job_attempts WHERE attempt_id='legacy-a'"
+        ).fetchone()[0] == legacy_audit_database
+
+
+@pytest.mark.parametrize("failure", ["migration", "commit"])
+def test_migration_failure_never_caches_success_and_can_retry(
+    legacy_audit_database, monkeypatch, failure
+):
+    migrate = job_store._migrate_legacy_configurations
+    connect = sqlite3.connect
+    fail_once = True
+
+    def fail_migration(conn):
+        nonlocal fail_once
+        migrate(conn)
+        if failure == "migration" and fail_once:
+            fail_once = False
+            raise sqlite3.OperationalError("injected migration failure")
+
+    class Connection(sqlite3.Connection):
+        def commit(self):
+            nonlocal fail_once
+            if failure == "commit" and fail_once:
+                fail_once = False
+                raise sqlite3.OperationalError("injected commit failure")
+            return super().commit()
+
+    monkeypatch.setattr(job_store, "_migrate_legacy_configurations", fail_migration)
+    monkeypatch.setattr(job_store.sqlite3, "connect", lambda *a, **kw: connect(*a, **kw, factory=Connection))
+    with pytest.raises(sqlite3.OperationalError, match="injected"):
+        job_store.load_audit_view("legacy-job")
+    assert str(settings.db_path) not in job_store._migrated
+    _, attempts = job_store.load_audit_view("legacy-job")
+    assert len(attempts) == 1
+    assert attempts[0]["configuration"] == json.loads(legacy_audit_database)
+    assert str(settings.db_path) in job_store._migrated
+
+
+def test_consumer_failure_cannot_rollback_a_completed_legacy_migration(legacy_audit_database):
+    with pytest.raises(RuntimeError, match="consumer"):
+        with job_store.connection():
+            raise RuntimeError("consumer failed after schema initialization")
+    _, attempts = job_store.load_audit_view("legacy-job")
+    assert len(attempts) == 1 and attempts[0]["state"] == "legacy"
+    assert attempts[0]["configuration"] == json.loads(legacy_audit_database)

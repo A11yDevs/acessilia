@@ -437,9 +437,10 @@ class PddlAccessibilityOrchestrator:
         """
         media_state = ctx.checkpoints.load(PHASE_MEDIA)
         if media_state is not None:
-            ctx.checkpoints.accept(PHASE_MEDIA)
+            configuration = dict(media_state.get("configuration") or {})
             ctx.ports.services.media_inspection = media_state.get("inspection")
-            return media_state.get("inspection"), dict(media_state.get("configuration") or {})
+            ctx.checkpoints.accept(PHASE_MEDIA)
+            return media_state.get("inspection"), configuration
         # media.inspect runs first: a slide deck is extracted and structured
         # slide by slide, which has to be decided before extraction.
         media_inspection, media_configuration = await _inspect_media(
@@ -588,6 +589,7 @@ class PddlAccessibilityOrchestrator:
                 replan_required=bool(execution_state.get("replan_required")),
                 remaps=list(execution_state.get("remaps") or []),
             )
+            checkpoints.accept(PHASE_EXECUTION)
         on_step = (
             checkpoints.execution_saver(plan, resumed=execution_state)
             if checkpoints.active and not self.execute_dry_run

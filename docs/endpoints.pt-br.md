@@ -60,6 +60,29 @@ Observações:
 - O campo `pipeline` no histórico registra o cliente de IA e o motor que rodou o job, no formato `<ai_client>-<engine>` (por exemplo `ollama-pddl`). O motor é `pddl` em todo job atual, mas os jobs enviados pela API gravam o valor bruto de `PIPELINE_ENGINE`, então o alias `pmv` aparece como `ollama-pmv`; `legacy` só aparece em registros de antes de esse motor ser desativado (veja `PIPELINE_ENGINE` em [architecture.pt-br.md](architecture.pt-br.md)).
 - Documentação interativa padrão do FastAPI em `GET /docs` e `GET /openapi.json`.
 
+**Fronteiras de armazenamento e recuperação:** A migração aditiva do SQLite,
+incluindo a preservação do JSON original da configuração do #942, é consolidada
+sob a trava de migração antes de entregar a conexão ao leitor/escritor. A marca
+de sucesso em memória só é definida depois do commit; falhas permitem nova
+tentativa. A leitura de auditoria abre sua própria transação consistente. A
+proveniência do checkpoint só é marcada depois do aceite efetivo do conteúdo:
+a execução exige validar `ProcessingManifest`/`ExecutionStepResult` e construir
+`ExecutionResume`, além de conferir o id do plano. A conversão da configuração
+de mídia também precisa concluir.
+
+Após a publicação do download, a tentativa concluída e o status `done` do job,
+incluindo o link, compartilham uma transação SQLite. Shutdown cooperativo após
+essa fronteira preserva arquivos e status terminal, sem torná-los trabalho
+retomável. Falha da auditoria ou ausência do snapshot aciona a persistência best
+effort do status terminal; nenhuma delas pode apagar um resultado publicado.
+Um crash abrupto antes de consolidar esse status permanece indeterminado:
+a recuperação segue a política existente de checkpoint/reenvio. Uma linha de
+auditoria concluída, sozinha, não prova arquivo/token de entrega válido; registros
+antigos inconsistentes não fazem a recuperação inventar um download nem
+sobrescrever uma tentativa terminal. Não há transação entre SQLite, filesystem,
+serviço de downloads e e-mail, nem garantia de entrega exatamente uma vez.
+Identidade do produtor e retenção operacional permanecem separadas nas #957/#958.
+
 ### Acesso aos jobs, opções de processamento e recuperação
 
 - `POST /api/v1/jobs` aceita submissões sem login e devolve `job_token` além de `task_id`/`position`. Guarde o token: `GET /api/v1/jobs/{task_id}` e `POST /api/v1/jobs/{task_id}/cancel` exigem `X-Job-Token: <job_token>`. Token ausente/incorreto retorna 404 sem revelar se o job existe. Jobs sem credencial de autorização persistida não podem ser acessados; reenvie o documento se o token do job estiver indisponível.

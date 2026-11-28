@@ -528,18 +528,63 @@ def test_an_execution_checkpoint_from_another_plan_is_not_reused() -> None:
     assert outcome.reused_phases == []
 
 
-def test_a_matching_execution_checkpoint_is_reused() -> None:
-    config = core_config()
+@pytest.mark.asyncio
+@pytest.mark.parametrize("legacy", [False, True])
+async def test_a_matching_execution_checkpoint_is_reused_only_when_resume_is_valid(legacy):
+    import asyncio
+
+    manifest = build_manifest([build_element("p", "paragraph", text="Original text.")], [])
+    orchestrator = build_orchestrator()
+    plan, _ = orchestrator._build_plan(manifest)
     store = MemoryCheckpoints("job-execution-match")
-    writer = RunCheckpoints(store, config)
-    payload = writer._stamp(
-        {"plan_id": "current-plan", "manifest": {}, "results": []},
-        PHASE_STAGES[PHASE_EXECUTION],
-    )
+    payload = {"plan_id": plan.plan_id, "manifest": manifest_payload(manifest), "results": []}
+    if not legacy:
+        payload = RunCheckpoints(store, core_config())._stamp(payload, PHASE_STAGES[PHASE_EXECUTION])
     store.phases[PHASE_EXECUTION] = payload
     outcome = RunOutcome()
-    reader = RunCheckpoints(store, config, outcome=outcome)
-    plan = SimpleNamespace(plan_id="current-plan")
-
-    assert load_execution_state(reader, plan) == payload
+    reader = RunCheckpoints(store, core_config(), outcome=outcome)
+    state = load_execution_state(reader, plan)
+    assert state == payload and outcome.reused_phases == []
+    _, report = await orchestrator._run_plan(
+        plan, manifest, state, reader, None, asyncio.get_running_loop(), executor=orchestrator.executor
+    )
+    assert report.status == "completed"
     assert outcome.reused_phases == [PHASE_EXECUTION]
+    reader.accept(PHASE_EXECUTION)
+    assert outcome.reused_phases == [PHASE_EXECUTION]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid", ["manifest", "results"])
+async def test_matching_plan_with_invalid_resume_content_is_not_provenance(invalid):
+    import asyncio
+
+    from pydantic import ValidationError
+
+    manifest = build_manifest([build_element("p", "paragraph", text="Original text.")], [])
+    orchestrator = build_orchestrator()
+    plan, _ = orchestrator._build_plan(manifest)
+    payload = {"plan_id": plan.plan_id, "manifest": manifest_payload(manifest), "results": []}
+    payload[invalid] = {} if invalid == "manifest" else [{"status": "invalid"}]
+    store = MemoryCheckpoints("job-invalid-resume")
+    store.phases[PHASE_EXECUTION] = RunCheckpoints(store, core_config())._stamp(payload, PHASE_STAGES[PHASE_EXECUTION])
+    outcome = RunOutcome()
+    reader = RunCheckpoints(store, core_config(), outcome=outcome)
+    state = load_execution_state(reader, plan)
+    with pytest.raises(ValidationError):
+        await orchestrator._run_plan(
+            plan, manifest, state, reader, None, asyncio.get_running_loop(), executor=orchestrator.executor
+        )
+    assert outcome.reused_phases == []
+
+
+@pytest.mark.asyncio
+async def test_invalid_media_configuration_is_not_accepted_as_reuse():
+    store = MemoryCheckpoints("job-invalid-media")
+    store.phases["media"] = {"inspection": None, "configuration": [1]}
+    outcome = RunOutcome()
+    reader = RunCheckpoints(store, core_config(), outcome=outcome)
+    ctx = SimpleNamespace(checkpoints=reader, ports=RunPorts.none())
+    with pytest.raises((ValueError, TypeError)):
+        await build_orchestrator()._load_or_inspect_media(ctx)
+    assert outcome.reused_phases == []
