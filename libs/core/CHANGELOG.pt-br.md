@@ -7,7 +7,8 @@ Inglês, versão normativa: [English version](CHANGELOG.md).
 `RunOutcome` expõe ao host a origem canônica observada e as fases de checkpoint
 aceitas, sem persistência nem dependências do serviço. Carregar um checkpoint de
 execução compatível não é reuso: o orquestrador só o marca depois de validar seu
-manifesto/resultados e construir `ExecutionResume`. Configuração de mídia inválida
+manifesto/resultados, construir `ExecutionResume` e conferir as regras existentes
+de ordem/quantidade do executor. Configuração de mídia inválida
 também é recusada antes de registrar proveniência. Checkpoints legados aceitos
 mantêm a política existente de compatibilidade e são registrados uma única vez.
 SDK, contratos da Toolbox e domínio PDDL permanecem iguais.

@@ -67,7 +67,8 @@ marker is set only after commit; failure remains retryable. An audit read starts
 its own independent consistent read transaction. Checkpoint provenance is marked
 only after the actual payload is adopted: execution requires successful
 `ProcessingManifest`/`ExecutionStepResult` validation and `ExecutionResume`
-construction, not merely a matching plan id. Media configuration conversion must
+construction and the executor’s existing result-order/count checks, not merely
+a matching plan id. Media configuration conversion must
 succeed too.
 
 After download publication, the completed attempt and `done` job status (including

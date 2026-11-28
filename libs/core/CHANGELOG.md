@@ -7,7 +7,8 @@ Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 `RunOutcome` exposes the run's observed canonical origin and accepted checkpoint
 phases to its host, without persistence or service dependencies. Loading a
 matching execution checkpoint is not reuse: the orchestrator marks it only after
-validating its manifest/results and building `ExecutionResume`. Invalid media
+validating its manifest/results, building `ExecutionResume` and checking the
+executor’s existing result-order/count rules. Invalid media
 configuration is also refused before provenance is marked. Accepted legacy
 checkpoints retain the existing compatibility policy and are recorded once.
 The SDK, Toolbox contracts and PDDL domain are unchanged.
