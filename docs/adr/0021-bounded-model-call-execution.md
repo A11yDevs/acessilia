@@ -67,18 +67,28 @@ variable is unset or -1 (at least the historical 4) and warns at startup, withou
 refusing it, when an explicit value cannot cover the configured jobs. The
 warning names the exact pending capacity that closes the gap. Over capacity is
 a degraded mode, not an unsafe one, and the stages may use fewer calls than
-their bound. The formula assumes a job's enrichment subplans stay sequential, so
-one stage bound applies at a time; parallel subplans would need a new aggregate
-budget (#828). Sizing the admission capacity does not make multi-job execution
-safe, so `QUEUE_MAX_CONCURRENT` above 1 stays gated behind the explicit
-`QUEUE_MULTI_JOB_EXPERIMENTAL=true` opt-in until #238 W1 supplies per-source
-fairness, a public cancellation API and the memory/failure-isolation decisions
-(#830). The settings validation, the queue factory and the queue constructor
-enforce the same invariant. The formula is nominal and local to the queue
-instance: cancellation overlap can keep one extra item processing, and a second
-replica has its own queue, so it is not a cross-replica bound. Process setup
-logs one warning when the experimental mode is authorized, not once per queue
-or job.
+their bound. The product describes a job whose enrichment stages stay
+sequential: pictures and formulas each hold one `VISION_CONCURRENCY` semaphore
+and tables run one at a time, so at most `VISION_CONCURRENCY` calls are in
+flight for that job. `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` is the process
+worst case under that assumption, not the peak of a single stage or a measured
+demand (#831). If PDDL execution later runs enrichment subplans in parallel,
+their in-flight calls add up and this assumption stops describing demand;
+revisit the capacity model before enabling them. Prefer one aggregate per-job
+model-call budget shared by the subplans, with `MODEL_CALL_WORKERS` still
+bounding the process, over giving each subplan an independent executor or queue
+and multiplying the capacity. Derive the pending capacity from that aggregate
+budget and the queue's concurrency once it exists; until then the formula in
+this ADR applies only to sequential enrichment. Sizing the admission capacity
+does not make multi-job execution safe, so `QUEUE_MAX_CONCURRENT` above 1 stays
+gated behind the explicit `QUEUE_MULTI_JOB_EXPERIMENTAL=true` opt-in until #238
+W1 supplies per-source fairness, a public cancellation API and the
+memory/failure-isolation decisions (#830). The settings validation, the queue
+factory and the queue constructor enforce the same invariant. The formula is
+nominal and local to the queue instance: cancellation overlap can keep one extra
+item processing, and a second replica has its own queue, so it is not a
+cross-replica bound. Process setup logs one warning when the experimental mode
+is authorized, not once per queue or job.
 
 A rejection is admission pressure, not provider health. It is retried once
 like a timeout, without consuming an answer attempt; if it persists, the stage
