@@ -210,9 +210,11 @@ def test_a_table_is_left_to_the_table_step(table_first) -> None:
 
 
 def test_the_edge_rule_never_makes_a_cycle_between_document_steps() -> None:
-    """The guard behind the policy: even with obligations of both steps on
-    one element (none of today's rules makes that), an earlier step's never
-    depends on a later one's, in whichever order they are reconciled."""
+    """Incidental target overlap cannot invent a dependency in either direction.
+
+    No current candidate rule creates this overlap; neither step declares the
+    other as a predecessor, regardless of reconciliation/registration order.
+    """
     from acessilia_core.manifest.models import Obligation
     from acessilia_core.pipeline.document_obligations import _reconcile_edges
 
@@ -229,7 +231,7 @@ def test_the_edge_rule_never_makes_a_cycle_between_document_steps() -> None:
         _reconcile_edges(manifest, step)
 
     by_id = {item.id: item for item in manifest.obligations}
-    assert by_id["d"].dependencies == [] and by_id["e"].dependencies == ["d"]
+    assert by_id["d"].dependencies == [] and by_id["e"].dependencies == []
     validate_obligation_graph(manifest)
 
 

@@ -344,9 +344,9 @@ the manifest. **The enrichment migration needs no domain change.**
    plan. It shares the formulas with the formula LaTeX, which must come
    after it (the classification decides whether a region is mathematics), so
    `recognize-formulas` depends on `classify-formula-regions` for the
-   formulas they share: `DOCUMENT_STEPS` lists the classification first, and
-   the edge rule follows it. An element the descriptions turned into a
-   formula (a picture or a placeholder visual) is not classified: the
+   formulas they share: recognition declares classification as a predecessor;
+   registration order validates that declaration. An element the descriptions
+   turned into a formula (a picture or a placeholder visual) is not classified: the
    descriptions ran after the classification before planning, so it never
    was, and a second answer could drop the formula they gave. A
    classification that got no answer (`unclassified`) is tried again when
@@ -359,8 +359,8 @@ the manifest. **The enrichment migration needs no domain change.**
    the document's `mark-inline-math` obligation. The formula conversions
    (`verbalize-formula`, `normalize-formula`) read the variables its marks
    give, so they wait for it although they share no element: the step
-   declares them as `waiting_kinds`, a minimal declared dependency (#865
-   proposes predecessors in general). It shares a paragraph with the
+   declares them as `waiting_kinds`, an explicit document-scope information
+   dependency alongside its shared-target `predecessors` (#865). It shares a paragraph with the
    descriptions (a mostly visual document) and a stale table with the table
    enrichment, and comes after both. It calls no model, so the vision
    breaker does not order it; the steps that share that breaker
@@ -508,20 +508,38 @@ test (`is_describable`), so the step never takes an element it would then
 drop. A formula or a table, which the one-page fallback used to take, is
 left to its own steps and never retyped as a picture.
 
-**Between the steps** the policy is explicit: two steps share elements only
-when the first must run before the second, and `DOCUMENT_STEPS` lists them in
-that order; the edges follow it (a step's obligation may depend on an
-earlier step's that shares an element, never on a later one's), so they
-never make a cycle. Before the review of #845 the descriptions and the
-tables could share the table of a one-page document, and the target rule,
-applied by each step, made them depend on each other. Today the formula
-region classification and the formula LaTeX share formulas (M4a), and the
-inline math shares a paragraph with the descriptions and a stale table with
-the table enrichment (M4b); in each pair the first runs first. Apart from
-targets, a step may declare `waiting_kinds`: obligation kinds that wait for
-it whatever their targets (M4b: the formula conversions).
-The edges are reconciled once more after every step's obligations exist,
-so the first plan already orders two steps that share an element.
+**Between document steps**, `DocumentStep.predecessors` declares causal
+relationships (#865). An edge requires both a declaration on the dependent and
+shared targets. `DOCUMENT_STEPS` is the reconciliation order and checks that a
+declared predecessor appears earlier; registration order alone and a shared
+vision breaker never create edges. Duplicate kinds/predecessors and unknown,
+forward, self or cyclic declarations fail before any manifest mutation. The
+second edge pass remains necessary so the first plan sees all declared pairs.
+
+| Consumer | Predecessor / information source | Scope | Exhaustion policy |
+|---|---|---|---|
+| `recognize-formulas` | `classify-formula-regions` | shared targets | dependency remains mandatory |
+| `mark-inline-math` | `describe-images` | shared targets | dependency remains mandatory under the existing step policy |
+| `mark-inline-math` | `enrich-tables` | shared targets | dependency remains mandatory |
+| `verbalize-formula`, `normalize-formula` | `mark-inline-math` | document (`waiting_kinds`) | may degrade: `critical=False` releases exhausted edges |
+
+These declarations preserve the current real workflows. Independent document
+steps can overlap targets without acquiring a dependency; the historical
+synthetic description/table overlap now stays unordered in both directions.
+Ordinary element/page obligations retain the target-based rule and explicit
+`waiting_kinds` information dependencies. Those cross-target waits do not
+implicitly declare document-step predecessors. Open edges to a producer that
+no longer shares a target are removed; closed dependent obligations retain
+their historical graph. `critical` still controls exhaustion for the producer's
+managed outgoing edges in both scopes, rather than adding a new per-edge or
+manifest-dependent policy. In particular, the descriptions' delivery-dependent
+criticality is not redesigned here.
+
+This is a declaration of the existing Python coordination contract, preparing
+safe batching (#948) and causal-domain work (#934); it does not yet move these
+relations into PDDL. The shipped domain bundle/hashes and accepted plan
+checkpoints remain unchanged. No harness/reference regeneration is needed when
+only this rule changes and the historical canonical output remains equal.
 
 **The plan decides the targets.** The method describes its obligation's
 targets that are still describable and not described, whatever the

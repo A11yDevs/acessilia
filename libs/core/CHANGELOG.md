@@ -2,6 +2,17 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.34 — explicit document-step predecessors (#865)
+
+Document steps declare their shared-target causal predecessors. Registration
+order validates those declarations without creating dependencies of its own.
+Formula recognition declares classification; inline math declares picture
+and table enrichment. Invalid registries fail before manifest mutation.
+Ordinary obligations, document-scope information waits, exhaustion handling,
+closed-step history, DAG validation and the second edge pass are preserved.
+The domain bundle and saved-plan hashes are unchanged. This prepares #948/#934;
+it does not yet move workflow composition out of Python.
+
 ## 0.3.33 — validate resumed step order before provenance (#960)
 
 Execution checkpoint acceptance also reuses the executor's existing consecutive
