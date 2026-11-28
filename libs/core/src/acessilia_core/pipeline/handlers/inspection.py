@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected
 from acessilia_core.agents.output_schemas import PageInspectionOutput, VisionOutput
 from acessilia_core.agents.vision_agent import VisionAgent
 from acessilia_core.config import CoreConfig, ModelConfig, ToolboxConfig
@@ -327,6 +328,15 @@ def _handle_pymupdf_region_method(
             message=f"Inspected {len(elements)} source region(s)",
             artifacts=artifacts,
         )
+    except ModelCallClosed:
+        raise
+    except ModelCallRejected as exc:
+        return MethodResult(
+            success=False,
+            validated=False,
+            failure_kind="admission_rejected",
+            message=f"Region inspection deferred: {type(exc).__name__}: {exc}",
+        )
     except Exception as exc:
         return MethodResult(
             success=False,
@@ -517,6 +527,15 @@ def _handle_vision_page_inspection_method(
                 f"{len(inspected) - blank} described, {blank} blank"
             ),
             artifacts=artifacts,
+        )
+    except ModelCallClosed:
+        raise
+    except ModelCallRejected as exc:
+        return MethodResult(
+            success=False,
+            validated=False,
+            failure_kind="admission_rejected",
+            message=f"Page inspection deferred: {type(exc).__name__}: {exc}",
         )
     except Exception as exc:
         return MethodResult(

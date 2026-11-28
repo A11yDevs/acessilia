@@ -31,8 +31,10 @@ reason (``vision_failure_reason``: ``model_failed``, ``admission_rejected``,
 ``crop_unavailable``, …), and its ``describe-image`` obligation validates it.
 Failing the whole obligation for one picture would block the pictures that
 are described. The message reports what happened to each picture. The method
-fails when the step raises, and when none of its targets is in the manifest
-any more (``MSG_VISION_NO_PICTURE``), as ``table-enrichment`` does.
+fails when the step raises, when the local model-call runner rejected a
+target (``failure_kind="admission_rejected"``, #828), and when none of its
+targets is in the manifest any more (``MSG_VISION_NO_PICTURE``), as
+``table-enrichment`` does.
 """
 
 from __future__ import annotations
@@ -117,9 +119,14 @@ def _handle_picture_description_method(
     outcomes = Counter(_outcome(element) for element in pictures if element.id not in already)
     described = outcomes.pop("described", 0)
     formulas = outcomes.pop("formula", 0)
+    rejected = outcomes.get("admission_rejected", 0)
     return MethodResult(
-        success=True,
-        validated=True,
+        # Admission pressure means the step could not ask the model for those
+        # pictures: the method is deferred, not counted as tried, so the replan
+        # retries it instead of escalating them to human review (#828).
+        success=not rejected,
+        validated=not rejected,
+        failure_kind="admission_rejected" if rejected else None,
         message=n(*MSG_PICTURES_DESCRIBED, len(pictures)).format(
             count=len(pictures),
             described=described,

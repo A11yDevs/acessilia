@@ -373,7 +373,7 @@ def test_the_skip_messages_follow_the_locale() -> None:
 # The orchestrator's replans.
 
 
-def _run(orchestrator, manifest, tmp_path, monkeypatch):
+def _run(orchestrator, manifest, tmp_path, monkeypatch, ports=None):
     async def nothing(*_args, **_kwargs):
         return None
 
@@ -384,7 +384,7 @@ def _run(orchestrator, manifest, tmp_path, monkeypatch):
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
     return asyncio.run(orchestrator.execute(
         tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(),
-        model_calls=current_model_calls(), ports=RunPorts.none(),
+        model_calls=current_model_calls(), ports=ports or RunPorts.none(),
     ))
 
 
@@ -851,6 +851,30 @@ def test_the_discovery_count_survives_a_resume() -> None:
     state = asyncio.run(build_orchestrator()._load_or_build_plan(ctx, manifest))
 
     assert (state.replans, state.discoveries, state.previous_signature) == (1, 2, "abc")
+
+
+def test_admission_deferrals_survive_a_plan_checkpoint() -> None:
+    """The recovery budget is not reset by a plan replacement or a resume."""
+    manifest = _manifest()
+    config = core_config()
+    store = _Store()
+    checkpoints = RunCheckpoints(store, config)
+    availability = toolbox_gate.AvailabilityDecision.from_metadata({}, config.toolbox)
+    asyncio.run(checkpoints.save_plan(
+        _plan(manifest), None, manifest, availability, [], 1,
+        admission_deferred_ids={"o-2", "o-1"},
+    ))
+    payload = checkpoints.load(PHASE_PLAN)
+    assert payload["admission_deferred_ids"] == ["o-1", "o-2"]
+
+    ctx = SimpleNamespace(checkpoints=checkpoints, config=config, status_callback=None)
+    state = asyncio.run(build_orchestrator()._load_or_build_plan(ctx, manifest))
+    assert state.admission_deferred_ids == ("o-1", "o-2")
+
+    # A malformed or historical value restores no deferrals, but the
+    # checkpoint still resumes; the current report contributes what it has.
+    payload["admission_deferred_ids"] = "o-1"
+    assert asyncio.run(build_orchestrator()._load_or_build_plan(ctx, manifest)).admission_deferred_ids == ()
 
 
 def test_a_plan_checkpoint_of_0_3_12_resumes_without_a_signature() -> None:

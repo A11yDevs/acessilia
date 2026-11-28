@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from acessilia_core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
+from acessilia_core.execution.models import ExecutionStepResult
 from acessilia_core.i18n import t
 from acessilia_core.i18n.stage_messages import STAGE_PAGE_UNKNOWN
 from acessilia_core.manifest.models import (
@@ -225,7 +227,9 @@ def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:
     ]
 
 
-def _discovered_roots(manifest: ProcessingManifest) -> list[str]:
+def _discovered_roots(
+    manifest: ProcessingManifest, *, excluded: Iterable[str] = ()
+) -> list[str]:
     """The replannable obligations no failure touches (#842): never tried,
     and with no open, tried obligation among their dependencies, directly or
     not.
@@ -237,18 +241,31 @@ def _discovered_roots(manifest: ProcessingManifest) -> list[str]:
     found: preexisting work never tried is served too, since it does not
     spend the failure budget. What they leave out stays a job goal.
 
+    ``excluded`` names obligations that must count as touched even without an
+    attempt: a step the local model-call runner deferred was never tried, but
+    its recovery budget is the failure one, not the discovery one (#828).
+    Their dependents are excluded too, as for a tried failure.
+
     Precondition: the references are valid and the graph is a DAG; the
     replan loop validates them before (``validate_obligation_graph``). Each
     obligation is visited once.
     """
     by_id = {obligation.id: obligation for obligation in manifest.obligations}
+    excluded_ids = set(excluded)
     touched: dict[str, bool] = {}
 
     def is_touched(obligation_id: str) -> bool:
         if obligation_id not in touched:
             obligation = by_id[obligation_id]
-            touched[obligation_id] = (obligation.status != "satisfied" and bool(obligation.attempts)) or any(
-                is_touched(dependency) for dependency in obligation.dependencies
+            touched[obligation_id] = (
+                (
+                    obligation_id in excluded_ids
+                    and obligation.status != "satisfied"
+                )
+                or (obligation.status != "satisfied" and bool(obligation.attempts))
+                or any(
+                    is_touched(dependency) for dependency in obligation.dependencies
+                )
             )
         return touched[obligation_id]
 
@@ -258,10 +275,41 @@ def _discovered_roots(manifest: ProcessingManifest) -> list[str]:
     ]
 
 
-def replan_roots(manifest: ProcessingManifest, *, failure_budget_spent: bool) -> list[str]:
-    """Choose the next plan's roots and record why other goals wait (#883)."""
+def admission_deferred_obligation_ids(
+    steps: Iterable[ExecutionStepResult],
+) -> set[str]:
+    """Obligations whose step a local admission rejection deferred (#828)."""
+    return {
+        obligation_id
+        for step in steps
+        if getattr(step, "failure_kind", None) == "admission_rejected"
+        and (obligation_id := getattr(step, "obligation_id", None)) is not None
+    }
+
+
+def failure_budget_spent(kind: str, replans: int, max_replans: int) -> bool:
+    """Whether this discovery replan may serve untouched work only (#842)."""
+    return kind == "discovery" and replans >= max_replans
+
+
+def replan_roots(
+    manifest: ProcessingManifest,
+    *,
+    failure_budget_spent: bool,
+    excluded: Iterable[str] = (),
+) -> list[str]:
+    """Choose the next plan's roots and record why other goals wait (#883).
+
+    ``excluded`` keeps admission-deferred obligations (and their dependents)
+    out of the discovery fallback, so a spent failure budget is not extended
+    by the discovery budget (#828).
+    """
     eligible = _replannable_obligation_ids(manifest)
-    roots = _discovered_roots(manifest) if failure_budget_spent else eligible
+    roots = (
+        _discovered_roots(manifest, excluded=excluded)
+        if failure_budget_spent
+        else eligible
+    )
     eligible_ids = set(eligible)
     selected = set(roots)
     for obligation in manifest.obligations:

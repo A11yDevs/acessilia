@@ -367,6 +367,7 @@ def test_a_region_inspection_admission_rejection_fails_the_method_with_its_reaso
     )
 
     assert result.success is False and result.validated is False
+    assert result.failure_kind == "admission_rejected"
     assert result.message is not None
     assert "ModelCallRejected" in result.message
     assert "capacity is full" in result.message
