@@ -67,7 +67,8 @@ de sucesso em memória só é definida depois do commit; falhas permitem nova
 tentativa. A leitura de auditoria abre sua própria transação consistente. A
 proveniência do checkpoint só é marcada depois do aceite efetivo do conteúdo:
 a execução exige validar `ProcessingManifest`/`ExecutionStepResult` e construir
-`ExecutionResume`, além de conferir o id do plano. A conversão da configuração
+`ExecutionResume` e passar pelas verificações existentes de ordem/quantidade
+de resultados do executor, além de conferir o id do plano. A conversão da configuração
 de mídia também precisa concluir.
 
 Após a publicação do download, a tentativa concluída e o status `done` do job,
