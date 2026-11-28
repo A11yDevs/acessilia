@@ -323,13 +323,8 @@ def load_attempts(task_id: str) -> list[dict[str, Any]]:
 
 def load_latest_attempt(task_id: str) -> dict[str, Any] | None:
     """The job's latest attempt, or None when it has none."""
-    with connection() as conn:
-        row = conn.execute(
-            "SELECT * FROM job_attempts WHERE task_id=? "
-            "ORDER BY created_at DESC, rowid DESC LIMIT 1",
-            (task_id,),
-        ).fetchone()
-    return _attempt_record(row) if row is not None else None
+    attempts = load_attempts(task_id)
+    return attempts[-1] if attempts else None
 
 
 def _attempt_record(row: sqlite3.Row) -> dict[str, Any]:

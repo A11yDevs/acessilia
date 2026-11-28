@@ -138,8 +138,9 @@ class RunCheckpoints:
         the caller's content checks (an execution checkpoint from another
         plan, for example). Only an accepted phase is provenance.
         """
-        if self._outcome is not None:
-            self._outcome.mark_reused(phase)
+        if self._outcome is None:
+            return
+        self._outcome.mark_reused(phase)
 
     def _stamp(self, payload: dict[str, Any], stages: Iterable[str]) -> dict[str, Any]:
         payload[IDENTITY_KEY] = {stage: self._identity[stage] for stage in stages}
