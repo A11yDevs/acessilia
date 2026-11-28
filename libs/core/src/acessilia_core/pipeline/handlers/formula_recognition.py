@@ -32,8 +32,9 @@ ran for every formula of the obligation, not that each one now has LaTeX: a
 formula left without keeps its text and its reason
 (``formula_recognition_failure``), and its own obligations validate it. The
 message reports what happened to each formula. The method fails when the
-step raises, and when none of its targets is in the manifest any more
-(``MSG_MATH_NO_FORMULA``).
+step raises, when the local model-call runner rejected a target
+(``failure_kind="admission_rejected"``, #828), and when none of its targets
+is in the manifest any more (``MSG_MATH_NO_FORMULA``).
 
 **Inside the step the strategy stays fixed:** ``math.recognize`` first, the
 vision model as the fallback, each reading gated by the text layer. The plan
@@ -137,9 +138,13 @@ def _handle_formula_recognizer_method(
     pictures = outcomes.pop("picture", 0)
     outcomes.pop("unchanged", None)
     recognized = {method: outcomes.pop(method) for method in ("math.recognize", "vision") if method in outcomes}
+    rejected = outcomes.get("admission_rejected", 0)
     return MethodResult(
-        success=True,
-        validated=True,
+        # The formulas the local runner rejected were not read: keep the
+        # method available and let the replan retry it (#828).
+        success=not rejected,
+        validated=not rejected,
+        failure_kind="admission_rejected" if rejected else None,
         message=n(*MSG_FORMULAS_RECOGNIZED, len(formulas)).format(
             count=len(formulas),
             recognized=sum(recognized.values()),

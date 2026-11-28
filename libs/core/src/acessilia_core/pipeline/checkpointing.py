@@ -165,6 +165,7 @@ class RunCheckpoints:
         *,
         discoveries: int = 0,
         previous_signature: str | None = None,
+        admission_deferred_ids: Iterable[str] = (),
     ) -> None:
         await self.save(
             PHASE_PLAN,
@@ -181,6 +182,10 @@ class RunCheckpoints:
                 "replans": replans,
                 "discoveries": discoveries,
                 "previous_signature": previous_signature,
+                # A deterministic, ordered record of the admission deferrals
+                # the recovery budget must keep across a plan replacement and
+                # a resume (#828 review).
+                "admission_deferred_ids": sorted(set(admission_deferred_ids)),
             },
         )
 
@@ -219,6 +224,19 @@ class RunCheckpoints:
 
 #: The key of the execution checkpoint that holds the step running (#836).
 STEP_PROGRESS_KEY = "step_progress"
+
+
+def restored_admission_deferred_ids(payload: dict[str, Any]) -> tuple[str, ...]:
+    """The admission deferrals a plan checkpoint recorded, safely.
+
+    A checkpoint from before the field, or with a malformed value, restores
+    no deferrals: the current execution report still contributes the
+    deferrals of the run in progress (#828 review).
+    """
+    raw = payload.get("admission_deferred_ids")
+    if not isinstance(raw, list):
+        return ()
+    return tuple(item for item in raw if isinstance(item, str))
 
 
 def resumed_manifest(execution_state: dict[str, Any], plan: NominalPlan) -> dict[str, Any]:
@@ -348,5 +366,6 @@ __all__ = [
     "PHASE_STAGES",
     "RunCheckpoints",
     "manifest_payload",
+    "restored_admission_deferred_ids",
     "resumed_manifest",
 ]

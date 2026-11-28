@@ -22,7 +22,7 @@ from pddl_support import (
     build_orchestrator,
 )
 
-from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import ModelCallRejected, current_model_calls
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import n, t
@@ -181,6 +181,34 @@ def test_the_method_classifies_each_region_and_reports_it(monkeypatch) -> None:
         *MSG_FORMULA_REGIONS_CLASSIFIED, 3
     ).format(count=3, math=1, pictures=0, unresolved=1, already=0, left="model_failed: 1")
     assert _by_id(updated, "f-math").metadata["formula_classification"]["status"] == "math"
+
+
+def test_an_admission_rejection_defers_the_method(monkeypatch) -> None:
+    """The regions the local runner could not ask about keep the method
+    available instead of escalating them to human review (#828)."""
+
+    class RejectingVision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            raise ModelCallRejected("model-call execution capacity is full")
+
+    monkeypatch.setattr(formula_stage, "VisionAgent", RejectingVision)
+    monkeypatch.setattr(
+        formula_stage, "_formula_recognition_crop",
+        lambda _source, element, **_kwargs: (element.id.encode(), 1),
+    )
+    manifest = _manifest(("f-text", "x plus y"))
+
+    updated, report = _in_executor(manifest)
+
+    step = _step(report, "obligation-classify-formula-regions")
+    assert step.status == "failed"
+    assert step.failure_kind == "admission_rejected"
+    obligation = _by_id(updated, "obligation-classify-formula-regions")
+    assert obligation.status == "pending"
+    assert obligation.attempts == []
 
 
 def test_the_method_without_formulas_fails_instead_of_raising() -> None:

@@ -2,7 +2,7 @@
 
 Inglês, versão normativa: [English version](norm-fix-consumer.md).
 
-O Core 0.3.30 usa o SDK 0.7.1 para executar `norm-fix` por
+O Core 0.3.31 usa o SDK 0.7.1 para executar `norm-fix` por
 `document.text.normalize@1`, com `docstruct-text@1.0.0` e Docstruct 0.5.8.
 Provider, guarda de dependências e vinculação de identidade foram entregues nos
 [PRs Toolbox #174](https://github.com/A11yDevs/acessilia-toolbox/pull/174) e
@@ -90,7 +90,7 @@ de planejamento/desempenho e a retirada da predição local.
 
 Adicionar o provider de normalização muda a chave do cache de processamento e
 cada identidade de estágio dependente da Toolbox, inclusive mídia/extração.
-Um checkpoint com identidade da 0.3.29 sem esse provider é recusado na primeira
+Um checkpoint com identidade da 0.3.29/0.3.30 sem esse provider é recusado na primeira
 fase alterada; todas as fases posteriores são refeitas desde a origem, nunca
 normalizando novamente o texto processado salvo. Tentativas da versão nova com
 identidade igual reutilizam o passo consolidado; lotes interrompidos preservam
@@ -118,11 +118,11 @@ Para voltar à 0.3.29, restaure o ambiente Core/SDK correspondente e reinicie da
 origem com checkpoints antigos removidos, especialmente os sem identidade; não
 use um documento canônico já processado como origem. A nova chave de provider
 também torna checkpoints novos com identidade incompatíveis com a versão antiga.
-O #943 separado também propõe Core 0.3.30 e continua aberto; nenhuma release Core
-0.3.30 conflitante havia sido publicada na revisão. Ambos podem integrar uma
-release ainda não publicada; o segundo merge deve reconciliar changelogs/locks
-e incrementar a versão se a primeira implementação já tiver sido publicada.
-O bundle do domínio permanece igual.
+O PR #943 foi mesclado durante a revisão com Core 0.3.30 (adiamentos tipados
+por rejeição de admissão). Esta branch o incorpora e avança o Core para 0.3.31;
+metadados, changelogs e ambos os lockfiles correspondem. O SDK continua 0.7.1.
+O bundle do domínio permanece igual; também se aplicam as regras de
+compatibilidade de relatórios/checkpoints da 0.3.30.
 
 O cancelamento continua cooperativo. Um teste determinístico do job/fila pausa
 após a última resposta validada e antes do aceite do handler. `run_blocking`

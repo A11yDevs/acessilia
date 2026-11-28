@@ -291,9 +291,11 @@ def test_nothing_to_read_calls_no_model(monkeypatch) -> None:
 
 
 def test_an_admission_rejection_keeps_its_reason_and_spares_the_breaker(monkeypatch) -> None:
-    """#590 with #833: inside the plan, a full model-call runner is recorded as
-    ``admission_rejected`` on the manifest the executor returns, and does not
-    count against the provider (a breaker of threshold 1 would open)."""
+    """#590 with #833 and #828: inside the plan, a full model-call runner is
+    recorded as ``admission_rejected`` on the manifest the executor returns,
+    does not count against the provider (a breaker of threshold 1 would open),
+    and defers the method instead of spending it: the obligation stays pending
+    without an attempt, and the report says why the replan must retry it."""
     config = core_config(vision={"breaker_threshold": 1, "retry_pass_delay_seconds": 0})
     _answers(monkeypatch, [ModelCallRejected("full")] * 4)
     manifest = _two_unread_tables()
@@ -305,8 +307,13 @@ def test_an_admission_rejection_keeps_its_reason_and_spares_the_breaker(monkeypa
     assert failures == {"t-1": "admission_rejected", "t-2": "admission_rejected"}
     assert run_breaker(ports, config.vision).open is False
     enrich = next(item for item in executed.obligations if item.kind == TABLE_ENRICHMENT_KIND)
-    assert enrich.status == "satisfied"
-    assert "admission_rejected: 2" in enrich.attempts[-1].message
+    assert enrich.status == "pending"
+    assert enrich.attempts == []
+    step = next(item for item in report.steps if item.obligation_id == enrich.id)
+    assert step.status == "failed"
+    assert step.failure_kind == "admission_rejected"
+    assert "admission_rejected: 2" in (step.message or "")
+    assert report.status == "replan-required"
 
 
 def test_unavailable_text_spans_reach_the_manifest_the_executor_returns(monkeypatch) -> None:

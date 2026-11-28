@@ -23,7 +23,9 @@ table that could not be read keeps its reason (``table_read_failure``:
 ``linearize-table`` obligation validates it. Failing the whole obligation for
 one table would block the tables that are usable. The message reports what
 happened to each table, so the execution report never reads as if every table
-were enriched. The method fails only when a step raises.
+were enriched. The method fails when a step raises, or when the local
+model-call runner rejected a target (``failure_kind="admission_rejected"``,
+#828).
 """
 
 from __future__ import annotations
@@ -131,9 +133,14 @@ def _handle_table_enrichment_method(
     by_id = {element.id: element for element in manifest.elements}
     outcomes = Counter(_outcome(by_id[element_id]) for element_id in needing_ids)
     structured = outcomes.pop("read", 0) + outcomes.pop("from_text", 0)
+    rejected = outcomes.get("admission_rejected", 0)
     return MethodResult(
-        success=True,
-        validated=True,
+        # A table the local runner rejected was never read: defer the method
+        # so the replan retries it without spending the method or the table
+        # on human review (#828).
+        success=not rejected,
+        validated=not rejected,
+        failure_kind="admission_rejected" if rejected else None,
         message=n(*MSG_TABLES_ENRICHED, len(tables)).format(
             count=len(tables),
             needing=len(needing_ids),

@@ -2,7 +2,7 @@
 
 Brazilian Portuguese: [português brasileiro](norm-fix-consumer.pt-br.md).
 
-Core 0.3.30 uses SDK 0.7.1 to execute `norm-fix` through
+Core 0.3.31 uses SDK 0.7.1 to execute `norm-fix` through
 `document.text.normalize@1`, with `docstruct-text@1.0.0` and Docstruct 0.5.8.
 The provider, dependency guard and operation-identity prerequisite shipped in
 [Toolbox #174](https://github.com/A11yDevs/acessilia-toolbox/pull/174) and
@@ -88,7 +88,7 @@ remaining planning/performance decision and removal of local prediction.
 ## Upgrade, rollback and deployment configuration
 
 Adding the normalization provider changes the processing cache key and every
-Toolbox-dependent stage identity, including media/extraction. A stamped 0.3.29
+Toolbox-dependent stage identity, including media/extraction. A stamped 0.3.29/0.3.30
 checkpoint without that provider is rejected from the first changed phase;
 all later phases are recomputed from the source, never by normalizing the saved
 processed text again. New-version retries with unchanged identity reuse the
@@ -115,11 +115,10 @@ revision bump when their behavior changes, not merely a matching PDDL hash.
 For rollback to 0.3.29, restore the matching Core/SDK environment and restart
 from source with old checkpoints cleared (especially unstamped ones); do not
 submit an already processed canonical document as source. The new provider key
-makes stamped new checkpoints incompatible with the old identity too. The
-separate #943 also proposes Core 0.3.30 and is still open; no conflicting Core
-0.3.30 release was published when reviewed. Both may share one unpublished
-release; the second merge must reconcile changelogs/locks and bump if the first
-implementation has already been published. The domain bundle stays unchanged.
+makes stamped new checkpoints incompatible with the old identity too. PR #943 merged during review with Core 0.3.30 (typed admission deferrals).
+This branch incorporates it and advances Core to 0.3.31; package metadata,
+changelogs and both lockfiles agree. SDK remains 0.7.1. The domain bundle stays
+unchanged; 0.3.30's report/checkpoint compatibility rules also apply.
 
 Cancellation remains cooperative. A deterministic job/queue test pauses after
 the last validated response but before handler acceptance. `run_blocking` joins

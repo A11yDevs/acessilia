@@ -2,7 +2,7 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
-## 0.3.30 — remote one-pass normalization (#929)
+## 0.3.31 — remote one-pass normalization (#929)
 
 Review follow-up: normalization journal slots also bind endpoints and the
 existing deployment revision (`PROCESSING_MODEL_REVISION` through execution
@@ -22,6 +22,42 @@ qualification and limits are documented in the
 [consumer report](../../docs/architecture/norm-fix-consumer.md). Cross-obligation
 batching remains a separate planning decision (#948); other local methods remain
 migration debt under #804. Shipped PDDL domain hashes are unchanged.
+
+## 0.3.30 — local admission rejection reaches the planner as a retryable deferral (#828)
+
+The document enrichment stages already recorded `admission_rejected` per
+element, but the PDDL coordinator only saw generic failures or a successful
+collective step. A full local model-call runner is operational capacity, not
+provider health or a semantic result, and the planner can now tell it apart.
+- `MethodResult.failure_kind` and `ExecutionStepResult.failure_kind` carry
+  `admission_rejected` as a typed value. The execution-report schema is now
+  `1.1.0`, with the optional field; reports without it still validate.
+- The picture, table, formula-classification and formula-recognition methods
+  return a failed result with that kind when any target was admission-rejected,
+  instead of claiming the collective step completed.
+- The executor records the step as `failed` with the typed kind, leaves the
+  obligation `pending`, records no method attempt and asks for a replan. The
+  same method stays available, so the replan retries it for the objects still
+  pending within `max_replans`. A deferred action spends the failure recovery
+  budget, not the discovery one; when it is spent, the open obligation follows
+  the delivery policy (a critical one fails the job). The plan checkpoint
+  records the deferred ids (`admission_deferred_ids`), so a plan replacement or
+  resume keeps the budget; checkpoints before the field restore none. A closed
+  runner stays an execution failure; provider unavailability, timeouts and
+  insufficient answers keep their own policy of recording the method as tried
+  and using the alternatives.
+- A method that adds obligations before an admission rejection still has them
+  selected, so the replan does not lose the work it discovered (#594).
+- The rejection keeps the method eligible; it does not force the planner to
+  choose it again, since changed availability, costs or goals can select another
+  admissible method.
+- Execution reports 1.0.0 remain readable as historical records; new reports
+  use 1.1.0. A 0.3.29 core cannot read a 0.3.30 execution checkpoint with
+  `failure_kind`, so rolling back discards the plan/execution checkpoints and
+  starts fresh.
+- Region and page inspection return the typed kind instead of a generic
+  failure when the local runner rejects the call.
+- The PDDL domain and the Core–Toolbox contracts do not change.
 
 ## 0.3.29 — the Toolbox catalogue is always the plan's input (#809)
 

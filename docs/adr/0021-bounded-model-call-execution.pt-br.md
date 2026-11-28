@@ -84,7 +84,25 @@ Uma rejeição é pressão de admissão, não saúde do provider. Ela é tentada
 de novo, como um timeout, sem consumir uma tentativa de resposta; se persistir, a
 etapa registra `admission_rejected` (imagens, tabelas, fórmulas), deixa o breaker
 compartilhado intacto e mantém a execução fora do cache para que uma nova
-execução a retente. Um runner fechado gera o subtipo `ModelCallClosed`: é
+execução a retente. Dentro de um plano, os métodos de enriquecimento de
+documento a carregam como `MethodResult.failure_kind="admission_rejected"`; o
+executor a reporta em `ExecutionStepResult.failure_kind`, mantém a obrigação
+pendente sem registrar o método como tentado, e o replanejador repete a mesma
+ação dentro de `max_replans` (#828). A rejeição mantém o método elegível; ela
+não força o planejador a escolhê-lo de novo, porque mudanças de disponibilidade,
+custos ou metas podem selecionar legitimamente outro método admissível. Uma
+ação adiada gasta o orçamento de recuperação de falhas, não o de discovery;
+esgotado esse orçamento, a obrigação aberta segue a política de entrega (uma
+crítica falha o job), e uma nova execução pode retentá-la. O checkpoint do plano
+registra os ids adiados (`admission_deferred_ids`), então a troca de plano ou a
+retomada mantém o mesmo orçamento; um checkpoint anterior ao campo não restaura
+nenhum, e o relatório de execução corrente contribui com os adiamentos que tem.
+Relatórios de execução 1.0.0 continuam legíveis como registros históricos,
+enquanto os novos usam 1.1.0. Um core 0.3.29 não lê um checkpoint de execução
+0.3.30 que carrega `failure_kind`, então um rollback descarta os checkpoints de
+plano/execução e começa do zero. Indisponibilidade do provider, timeout e
+resposta insuficiente continuam falhas comuns, com sua própria política. Um
+runner fechado gera o subtipo `ModelCallClosed`: é
 ciclo de vida, não pressão de capacidade, então os agentes não o retentam e as
 etapas abortam em vez de registrar uma degradação recuperável. O fechamento
 também acorda chamadores pendentes e ativos com o mesmo subtipo.

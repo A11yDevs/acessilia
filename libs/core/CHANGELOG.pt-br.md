@@ -2,7 +2,7 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
-## 0.3.30 — normalização remota em uma passagem (#929)
+## 0.3.31 — normalização remota em uma passagem (#929)
 
 Após revisão: slots do diário de normalização também vinculam endpoints e a
 revisão de implantação existente (`PROCESSING_MODEL_REVISION` nas opções do
@@ -23,6 +23,44 @@ limites estão no [relatório do consumidor](../../docs/architecture/norm-fix-co
 Agrupar obrigações continua uma decisão de planejamento separada (#948); os
 demais métodos locais continuam como dívida da #804. Os hashes do domínio PDDL
 publicado permanecem iguais.
+
+## 0.3.30 — a rejeição de admissão local chega ao planejador como adiamento retentável (#828)
+
+As etapas de enriquecimento de documento já registravam `admission_rejected`
+por elemento, mas o coordenador PDDL só via falhas genéricas ou um passo
+coletivo bem-sucedido. Um executor de chamadas de modelo cheio é capacidade
+operacional, não saúde do provider nem resultado semântico, e o planejador
+agora distingue os casos.
+- `MethodResult.failure_kind` e `ExecutionStepResult.failure_kind` carregam
+  `admission_rejected` como valor tipado. O schema do relatório de execução
+  agora é `1.1.0`, com o campo opcional; relatórios sem ele continuam válidos.
+- Os métodos de imagens, tabelas, classificação de regiões de fórmula e
+  reconhecimento de fórmulas retornam um resultado de falha com esse tipo
+  quando algum alvo foi rejeitado por admissão, em vez de declarar o passo
+  coletivo concluído.
+- O executor registra o passo como `failed` com o tipo, deixa a obrigação
+  `pending`, não registra tentativa do método e pede replanejamento. O mesmo
+  método continua disponível, então o replanejamento o repete para os objetos
+  ainda pendentes dentro de `max_replans`. Uma ação adiada gasta o orçamento de
+  recuperação de falhas, não o de discovery; esgotado esse orçamento, a
+  obrigação aberta segue a política de entrega (uma crítica falha o job). O
+  checkpoint do plano registra os ids adiados (`admission_deferred_ids`), então
+  a troca de plano ou a retomada mantém o orçamento; checkpoints anteriores ao
+  campo não restauram nenhum. Um runner fechado continua sendo falha de
+  execução; indisponibilidade do provider, timeout e resposta insuficiente
+  mantêm a política de registrar o método como tentado e usar as alternativas.
+- Um método que adiciona obrigações antes de uma rejeição de admissão ainda as
+  seleciona, então o replanejamento não perde o trabalho descoberto (#594).
+- A rejeição mantém o método elegível; ela não força o planejador a escolhê-lo
+  de novo, porque mudanças de disponibilidade, custos ou metas podem selecionar
+  outro método admissível.
+- Relatórios de execução 1.0.0 continuam legíveis como registros históricos; os
+  novos usam 1.1.0. Um core 0.3.29 não lê um checkpoint de execução 0.3.30 com
+  `failure_kind`, então um rollback descarta os checkpoints de plano/execução e
+  começa do zero.
+- A inspeção de região e de página retorna o tipo em vez de uma falha genérica
+  quando o runner local rejeita a chamada.
+- O domínio PDDL e os contratos Core–Toolbox não mudam.
 
 ## 0.3.29 — o catálogo da Toolbox é sempre a entrada do plano (#809)
 

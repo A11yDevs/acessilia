@@ -46,7 +46,9 @@ from acessilia_core.execution.messages import (
     EXE_RESULT_REJECTED,
     EXE_START_JOB_INVALID_STATE,
     EXE_UNKNOWN_ACTION,
+    MSG_EXECUTION_STEP_FAILURE_KIND_REQUIRES_FAILED,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
+    MSG_METHOD_RESULT_FAILURE_KIND_REQUIRES_FAILURE,
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
 )
 from acessilia_core.export.markers import (
@@ -768,6 +770,8 @@ MESSAGES: tuple[str, ...] = (
     # Execution-model validation strings consumed by libs/core/src/acessilia_core/execution/models.py.
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
+    MSG_METHOD_RESULT_FAILURE_KIND_REQUIRES_FAILURE,
+    MSG_EXECUTION_STEP_FAILURE_KIND_REQUIRES_FAILED,
     # Tracker finish receipts shown when editing the live progress message at job end.
     MSG_STATUS_CONVERSION_DONE,
     MSG_STATUS_PROCESSING_FAILED,
@@ -1715,6 +1719,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Duplicate artifact identifier guard on MethodResult artifacts mapping.
         MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS: (
             "O resultado do método contém identificadores de artefatos duplicados"
+        ),
+        # Failure-kind guard: a failed method result must not claim success.
+        MSG_METHOD_RESULT_FAILURE_KIND_REQUIRES_FAILURE: (
+            "Um resultado de método com tipo de falha deve ser malsucedido e não validado"
+        ),
+        # Failure-kind guard: a step result with a failure kind must be failed.
+        MSG_EXECUTION_STEP_FAILURE_KIND_REQUIRES_FAILED: (
+            "Um resultado de passo com tipo de falha deve ter o status failed"
         ),
         # Tracker finish receipts mirroring the progress message end states edited in status_tracker.
         MSG_STATUS_CONVERSION_DONE: "✅ Conversão concluída!",

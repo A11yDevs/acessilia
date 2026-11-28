@@ -26,8 +26,9 @@ the changed steps and replans (M0).
 ran for every formula of the obligation. A formula the model gave no answer
 for stays ``unclassified`` with its reason and takes the formula path, whose
 recognition fallback can still reclassify it. The method fails when the step
-raises, and when none of its targets is in the manifest any more
-(``MSG_MATH_NO_FORMULA``).
+raises, when the local model-call runner rejected a target
+(``failure_kind="admission_rejected"``, #828), and when none of its targets
+is in the manifest any more (``MSG_MATH_NO_FORMULA``).
 """
 
 from __future__ import annotations
@@ -110,9 +111,14 @@ def _handle_formula_region_classifier_method(
     run_sync(_classify(manifest, Path(manifest.source.path), config, ports, targets, obligation_id))
     outcomes = Counter(_outcome(element) for element in formulas if element.id not in already)
     math, pictures, unresolved = (outcomes.pop(key, 0) for key in ("math", "picture", "unresolved"))
+    rejected = outcomes.get("admission_rejected", 0)
     return MethodResult(
-        success=True,
-        validated=True,
+        # Local capacity pressure left those regions undecided without asking
+        # the model: the replan retries the method instead of treating them as
+        # a provider or semantic failure (#828).
+        success=not rejected,
+        validated=not rejected,
+        failure_kind="admission_rejected" if rejected else None,
         message=n(*MSG_FORMULA_REGIONS_CLASSIFIED, len(formulas)).format(
             count=len(formulas),
             math=math,
