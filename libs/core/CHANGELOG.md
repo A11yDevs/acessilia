@@ -2,6 +2,14 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.33 — validate resumed step order before provenance (#960)
+
+Execution checkpoint acceptance also reuses the executor's existing consecutive
+index and plan-length checks before recording reuse. Structurally valid step
+models can still violate those rules; rejected resumes are not provenance.
+The executor retains its own guards for direct callers. Regression cases cover
+both out-of-order results and excess results without changing recovery policy.
+
 ## 0.3.32 — evidence of accepted checkpoint reuse (#944, #951)
 
 `RunOutcome` exposes the run's observed canonical origin and accepted checkpoint

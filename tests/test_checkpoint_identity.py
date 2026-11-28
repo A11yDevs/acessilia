@@ -555,7 +555,7 @@ async def test_a_matching_execution_checkpoint_is_reused_only_when_resume_is_val
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("invalid", ["manifest", "results"])
+@pytest.mark.parametrize("invalid", ["manifest", "results", "result-order", "result-count"])
 async def test_matching_plan_with_invalid_resume_content_is_not_provenance(invalid):
     import asyncio
 
@@ -565,13 +565,19 @@ async def test_matching_plan_with_invalid_resume_content_is_not_provenance(inval
     orchestrator = build_orchestrator()
     plan, _ = orchestrator._build_plan(manifest)
     payload = {"plan_id": plan.plan_id, "manifest": manifest_payload(manifest), "results": []}
-    payload[invalid] = {} if invalid == "manifest" else [{"status": "invalid"}]
+    if invalid in {"manifest", "results"}:
+        payload[invalid] = {} if invalid == "manifest" else [{"status": "invalid"}]
+    else:
+        _, report = orchestrator.executor.execute(plan, manifest)
+        first = report.steps[0].model_dump(mode="json")
+        indexes = [1] if invalid == "result-order" else range(len(plan.steps) + 1)
+        payload["results"] = [{**first, "index": index} for index in indexes]
     store = MemoryCheckpoints("job-invalid-resume")
     store.phases[PHASE_EXECUTION] = RunCheckpoints(store, core_config())._stamp(payload, PHASE_STAGES[PHASE_EXECUTION])
     outcome = RunOutcome()
     reader = RunCheckpoints(store, core_config(), outcome=outcome)
     state = load_execution_state(reader, plan)
-    with pytest.raises(ValidationError):
+    with pytest.raises((ValidationError, ValueError)):
         await orchestrator._run_plan(
             plan, manifest, state, reader, None, asyncio.get_running_loop(), executor=orchestrator.executor
         )

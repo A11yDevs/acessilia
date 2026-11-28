@@ -589,6 +589,9 @@ class PddlAccessibilityOrchestrator:
                 replan_required=bool(execution_state.get("replan_required")),
                 remaps=list(execution_state.get("remaps") or []),
             )
+            # Reuse the executor's existing sequence/count guards before
+            # recording provenance; direct executor callers are checked too.
+            ExecutorAgent._initial_working_state(plan, planning_manifest, resume)
             checkpoints.accept(PHASE_EXECUTION)
         on_step = (
             checkpoints.execution_saver(plan, resumed=execution_state)

@@ -2,6 +2,15 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.33 — validar ordem dos passos retomados antes da proveniência (#960)
+
+O aceite de checkpoints de execução também reutiliza as verificações existentes
+do executor para índices consecutivos e quantidade de passos antes de marcar
+reuso. Modelos de passo válidos ainda podem violar essas regras; retomadas
+recusadas não são proveniência. O executor mantém as verificações para chamadas
+diretas. Regressões cobrem resultados fora de ordem ou excedentes, sem mudar a
+política de recuperação.
+
 ## 0.3.32 — evidência de reuso de checkpoints aceitos (#944, #951)
 
 `RunOutcome` expõe ao host a origem canônica observada e as fases de checkpoint
