@@ -577,9 +577,15 @@ método, então o replanejamento mantém o método disponível e roda o passo de
 novo para os objetos ainda pendentes, dentro de `max_replans`. Uma ação adiada
 gasta o orçamento de recuperação de falhas, não o de discovery; esgotado esse
 orçamento, a obrigação aberta segue a política de entrega (uma crítica falha o
-job), e uma nova execução pode retentá-la. Indisponibilidade do provider,
-timeout e resposta insuficiente continuam falhas comuns de método: elas são
-registradas como tentadas e o replanejamento pode usar outro método.
+job), e uma nova execução pode retentá-la. O checkpoint do plano registra os
+ids adiados (`admission_deferred_ids`), então a troca de plano ou a retomada
+mantém o mesmo orçamento; um checkpoint anterior ao campo não restaura nenhum,
+e o relatório de execução corrente contribui com os adiamentos que tem. A
+rejeição mantém o método elegível; ela não força o planejador a escolhê-lo de
+novo, porque mudanças de disponibilidade, custos ou metas podem selecionar
+legitimamente outro método admissível. Indisponibilidade do provider, timeout
+e resposta insuficiente continuam falhas comuns de método: elas são registradas
+como tentadas e o replanejamento pode usar outro método.
 `ExecutionStepResult.failure_kind` expõe a distinção no relatório de execução; o
 domínio PDDL e os contratos Core–Toolbox não mudam. Um runner fechado é ciclo de
 vida, não pressão de capacidade, e continua sendo uma falha de execução.

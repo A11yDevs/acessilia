@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from acessilia_core.execution.messages import (  # noqa: E402
     MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION,
+    MSG_EXECUTION_STEP_FAILURE_KIND_REQUIRES_FAILED,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
     MSG_METHOD_RESULT_FAILURE_KIND_REQUIRES_FAILURE,
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
@@ -51,7 +52,7 @@ class MethodResult(StrictModel):
     def success_requires_validation(self) -> "MethodResult":
         if self.success and not self.validated:
             raise ValueError(t(MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION))
-        if self.success and self.failure_kind is not None:
+        if self.failure_kind is not None and (self.success or self.validated):
             raise ValueError(t(MSG_METHOD_RESULT_FAILURE_KIND_REQUIRES_FAILURE))
         artifact_ids = [artifact.id for artifact in self.artifacts]
         if len(artifact_ids) != len(set(artifact_ids)):
@@ -73,10 +74,17 @@ class ExecutionStepResult(StrictModel):
     #: failure (#828). Absent on an ordinary step.
     failure_kind: MethodFailureKind | None = None
 
+    @model_validator(mode="after")
+    def failure_kind_requires_failed_status(self) -> "ExecutionStepResult":
+        if self.failure_kind is not None and self.status != "failed":
+            raise ValueError(t(MSG_EXECUTION_STEP_FAILURE_KIND_REQUIRES_FAILED))
+        return self
+
 
 class ExecutionReport(StrictModel):
     schema_ref: str = Field(default=EXECUTION_SCHEMA_ID, alias="$schema")
-    schema_version: Literal["1.1.0"] = EXECUTION_SCHEMA_VERSION
+    #: 1.0.0 reports are read as historical records; new reports use 1.1.0.
+    schema_version: Literal["1.0.0", "1.1.0"] = EXECUTION_SCHEMA_VERSION
     execution_id: str = Field(min_length=1)
     plan_id: str = Field(min_length=1)
     manifest_id: str = Field(min_length=1)

@@ -91,7 +91,9 @@ run out of the cache so a rerun can retry it. Inside a plan, the enrichment
 methods type that reason as `failure_kind="admission_rejected"`; the executor
 keeps the obligation pending without recording the method as tried, and the
 replanner retries the same action within the failure recovery budget, not the
-discovery one (#828). Provider unavailability, timeouts and insufficient
+discovery one (#828); the plan checkpoint keeps the deferred ids across a plan
+replacement or resume. The method stays eligible but the planner may choose a
+different admissible one. Provider unavailability, timeouts and insufficient
 answers stay ordinary failures.
 Closing the runner raises the
 `ModelCallClosed` subtype instead; agents do not retry it and stages abort,

@@ -120,9 +120,13 @@ EXE_PREDECESSORS_UNSATISFIED: str = (
 MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION: str = ("A method result claimed as successful must also have passed its validation gate")
 #: Duplicate artifact identifier guard across the artifacts mapping on MethodResult, one per unique id expected; raise message text shown to users / developers reading that model's own pydantic validation context.
 MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS: str = ("The method result contains duplicate artifact identifiers")
-#: Requires a MethodResult carrying a failure kind to be a failed result, not a successful one.
+#: Requires a MethodResult carrying a failure kind to be failed and unvalidated.
 MSG_METHOD_RESULT_FAILURE_KIND_REQUIRES_FAILURE: str = (
-    "A method result with a failure kind must not be marked as successful"
+    "A method result with a failure kind must be failed and unvalidated"
+)
+#: Requires an ExecutionStepResult carrying a failure kind to be a failed step.
+MSG_EXECUTION_STEP_FAILURE_KIND_REQUIRES_FAILED: str = (
+    "A step result with a failure kind must have the failed status"
 )
 #: Description of the ExecutionReport JSON schema, resolved with t() when the schema is built; no placeholders.
 MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION: str = ("Report of the execution of a nominal plan over one manifest, with per-step method results and collected artifacts")

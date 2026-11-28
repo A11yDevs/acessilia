@@ -10,6 +10,8 @@ a timeout and a semantically insufficient result stay ordinary failures.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 from pddl_support import (
     build_element,
@@ -17,14 +19,19 @@ from pddl_support import (
     build_obligation,
     build_orchestrator,
 )
-from test_changed_obligations import _run
+from test_changed_obligations import _run, _Store
 
 from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected
 from acessilia_core.execution.executor import ExecutorAgent, MethodRegistry
-from acessilia_core.execution.models import MethodResult
+from acessilia_core.execution.models import (
+    ExecutionReport,
+    ExecutionStepResult,
+    MethodResult,
+)
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.planner_agent import PlannerAgent
+from acessilia_core.ports import PHASE_PLAN, NoRegionCache, RunPorts
 
 
 def _manifest() -> ProcessingManifest:
@@ -180,3 +187,107 @@ def test_a_successful_result_cannot_carry_a_failure_kind() -> None:
             validated=True,
             failure_kind="admission_rejected",
         )
+    with pytest.raises(ValueError):
+        MethodResult(
+            success=False,
+            validated=True,
+            failure_kind="admission_rejected",
+        )
+
+
+def test_a_1_0_0_execution_report_still_validates() -> None:
+    """A historical report is read by its own version; new steps omit the field."""
+    now = datetime.now(timezone.utc)
+    report = ExecutionReport(
+        schema_version="1.0.0",
+        execution_id="exec-1",
+        plan_id="plan-1",
+        manifest_id="manifest-1",
+        manifest_revision_before=1,
+        manifest_revision_after=1,
+        started_at=now,
+        completed_at=now,
+        mode="live",
+        status="completed",
+        replan_required=False,
+        steps=[
+            ExecutionStepResult(
+                index=0,
+                action="complete-job",
+                status="succeeded",
+                started_at=now,
+                completed_at=now,
+            )
+        ],
+    )
+
+    assert report.schema_version == "1.0.0"
+    assert report.steps[0].failure_kind is None
+
+
+def test_a_0_3_29_execution_step_still_validates() -> None:
+    """The old execution checkpoint has no failure_kind; the optional field
+    keeps it readable."""
+    step = ExecutionStepResult.model_validate(
+        {
+            "index": 0,
+            "action": "complete-job",
+            "status": "succeeded",
+            "started_at": "2026-11-27T20:00:00+00:00",
+            "completed_at": "2026-11-27T20:00:01+00:00",
+        }
+    )
+
+    assert step.failure_kind is None
+
+
+def test_a_step_failure_kind_requires_the_failed_status() -> None:
+    now = datetime.now(timezone.utc)
+    with pytest.raises(ValueError):
+        ExecutionStepResult(
+            index=0,
+            action="complete-job",
+            status="succeeded",
+            started_at=now,
+            completed_at=now,
+            failure_kind="admission_rejected",
+        )
+
+
+def test_a_recovered_deferral_does_not_block_a_dependent_discovery(monkeypatch, tmp_path) -> None:
+    """A was deferred and then satisfied; B, which depends on A, must still be
+    eligible for the discovery replan after the failure budget is spent."""
+    calls: list[str] = []
+    recovered: set[str] = set()
+    manifest = _manifest()
+    orchestrator = build_orchestrator(max_replans=1)
+
+    def handler(current: ProcessingManifest, obligation_id: str) -> MethodResult:
+        calls.append(obligation_id)
+        if obligation_id == "o-1" and obligation_id not in recovered:
+            recovered.add(obligation_id)
+            return _deferring(current, obligation_id)
+        if obligation_id == "o-1" and all(item.id != "o-b" for item in current.obligations):
+            dependent = build_obligation(
+                "review-structure", ["a"], ["vision-description", "human-review"]
+            )
+            dependent.id = "o-b"
+            dependent.selected = True
+            dependent.dependencies = ["o-1"]
+            dependent.method_costs = {"vision-description": 1, "human-review": 100}
+            current.obligations.append(dependent)
+            current.summary.obligation_count += 1
+        return MethodResult(success=True, validated=True)
+
+    orchestrator.executor.registry.register("vision-description", handler)
+    store = _Store()
+    ports = RunPorts(
+        region_cache=NoRegionCache(), checkpoints=store, operations=None
+    )
+
+    _run(orchestrator, manifest, tmp_path, monkeypatch, ports=ports)
+
+    assert calls == ["o-1", "o-1", "o-b"]
+    # The discovery replan persisted the deferral before serving B, so a
+    # resume cannot treat A as fresh admission work.
+    assert store.payloads[PHASE_PLAN]["admission_deferred_ids"] == ["o-1"]

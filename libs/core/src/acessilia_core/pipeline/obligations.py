@@ -258,7 +258,10 @@ def _discovered_roots(
         if obligation_id not in touched:
             obligation = by_id[obligation_id]
             touched[obligation_id] = (
-                obligation_id in excluded_ids
+                (
+                    obligation_id in excluded_ids
+                    and obligation.status != "satisfied"
+                )
                 or (obligation.status != "satisfied" and bool(obligation.attempts))
                 or any(
                     is_touched(dependency) for dependency in obligation.dependencies

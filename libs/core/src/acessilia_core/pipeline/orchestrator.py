@@ -50,6 +50,7 @@ from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import (
     RunCheckpoints,
     manifest_payload,
+    restored_admission_deferred_ids,
     resumed_manifest,
 )
 from acessilia_core.pipeline.document_obligations import reconcile_document_steps
@@ -147,6 +148,8 @@ class _PlanningState:
     discoveries: int = 0
     #: The planning signature the last discovery replan started from (#832).
     previous_signature: str | None = None
+    #: Admission deferrals whose recovery budget survives plan and resume (#828).
+    admission_deferred_ids: tuple[str, ...] = ()
 
 
 class PddlAccessibilityOrchestrator:
@@ -403,6 +406,7 @@ class PddlAccessibilityOrchestrator:
             replans=planning.replans,
             discoveries=planning.discoveries,
             previous_signature=planning.previous_signature,
+            admission_deferred_ids=planning.admission_deferred_ids,
             executor=executor,
         )
         self._check_unsatisfied(manifest, execution_report)
@@ -529,6 +533,7 @@ class PddlAccessibilityOrchestrator:
                 replans=int(plan_state.get("replans") or 0),
                 discoveries=int(plan_state.get("discoveries") or 0),
                 previous_signature=plan_state.get("previous_signature"),
+                admission_deferred_ids=restored_admission_deferred_ids(plan_state),
             )
         if ctx.status_callback:
             await ctx.status_callback(t(STAGE_GENERATING_PDDL_PLAN))
@@ -703,30 +708,23 @@ class PddlAccessibilityOrchestrator:
         replans: int,
         discoveries: int = 0,
         previous_signature: str | None = None,
+        admission_deferred_ids: tuple[str, ...] = (),
         executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport, Any, Any]:
-        """Plan and execute again while the report asks for it, within
-        ``max_replans`` (after a failed step) and ``max_discovery_replans``
-        (after a run that changed the obligations).
-
-        Returns the last manifest, report, plan and comparison. The replan count
-        and the plan it produced come from the checkpoint, so a restart after a
-        replan neither repeats one nor exceeds the budget.
+        """Plan and execute again while the report asks for it, within the
+        failure and discovery budgets; a restart keeps both counts and the
+        admission deferrals from the checkpoint.
         """
         # A `replan-required` report means the executor left work for a replan;
-        # without this loop the status was terminal and no document was made.
-        # Admission deferrals spend the failure budget, never discovery (#828).
-        deferred_ids: set[str] = set()
+        # admission deferrals spend the failure budget, never discovery (#828).
+        deferred_ids: set[str] = set(admission_deferred_ids)
         while self._replan_needed(execution_report, manifest):
             # A failure replan counts toward ``max_replans``; a discovery replan
-            # follows changed obligations with its own bound, stopped by the
-            # planning-signature guard saved with the plan (#594, #832).
+            # follows changed obligations with its own bound and signature guard.
             failure = any(step.status == "failed" for step in execution_report.steps)
             deferred_ids.update(admission_deferred_obligation_ids(execution_report.steps))
             # Reconciled first, so the guard and the roots see the same state.
-            # A table the run added is enriched before its own obligations.
             reconcile_document_steps(manifest, replan=True)
-            # The guard reads the graph: a dangling reference fails here, named.
             validate_obligation_graph(manifest)
             signature = planning_signature(manifest)
             kind = self._replan_kind(failure, replans, discoveries, signature, previous_signature)
@@ -771,6 +769,7 @@ class PddlAccessibilityOrchestrator:
             await checkpoints.save_plan(
                 plan, comparison, planning_manifest, availability, gated, replans,
                 discoveries=discoveries, previous_signature=previous_signature,
+                admission_deferred_ids=deferred_ids,
             )
             # The previous execution checkpoint belongs to the previous plan.
             checkpoints.remove(PHASE_EXECUTION)

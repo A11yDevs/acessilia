@@ -112,8 +112,11 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "1.1.0",
       "default": "1.1.0",
+      "enum": [
+        "1.0.0",
+        "1.1.0"
+      ],
       "title": "Schema Version",
       "type": "string"
     },

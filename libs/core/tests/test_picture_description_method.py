@@ -362,6 +362,29 @@ def test_a_formula_found_before_an_admission_rejection_stays_selected(monkeypatc
     assert discovered.status == "candidate"
     assert _step(report, "obligation-describe-images").failure_kind == "admission_rejected"
 
+    # The selected work is actually served by the next plan, not just kept.
+    from acessilia_core.execution.models import MethodResult
+
+    calls: list[str] = []
+    executor = build_orchestrator().executor
+    registry = bind_run(build_method_registry(), CONFIG, RunPorts.none())
+    for method in ("mathml", "latex-verbalizer", "human-review"):
+        registry.register(
+            method,
+            lambda _manifest, obligation_id: (
+                calls.append(obligation_id) or MethodResult(success=True, validated=True)
+            ),
+        )
+    executor.registry = registry
+    updated.status = "extracted"
+    _, plan = PlannerAgent().plan(
+        updated, selected_roots=["obligation-verbalize-formula-p-1"]
+    )
+    final, _ = executor.execute(plan, updated)
+
+    assert calls == ["obligation-verbalize-formula-p-1"]
+    assert _by_id(final, "obligation-verbalize-formula-p-1").status == "satisfied"
+
 
 def test_the_method_without_pictures_fails_instead_of_raising() -> None:
     manifest = _pictures_manifest("p-1")

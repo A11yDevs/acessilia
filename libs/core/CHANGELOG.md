@@ -19,12 +19,21 @@ provider health or a semantic result, and the planner can now tell it apart.
   same method stays available, so the replan retries it for the objects still
   pending within `max_replans`. A deferred action spends the failure recovery
   budget, not the discovery one; when it is spent, the open obligation follows
-  the delivery policy (a critical one fails the job). A closed runner stays an
-  execution failure; provider unavailability, timeouts and insufficient
-  answers keep their own policy of recording the method as tried and using the
-  alternatives.
+  the delivery policy (a critical one fails the job). The plan checkpoint
+  records the deferred ids (`admission_deferred_ids`), so a plan replacement or
+  resume keeps the budget; checkpoints before the field restore none. A closed
+  runner stays an execution failure; provider unavailability, timeouts and
+  insufficient answers keep their own policy of recording the method as tried
+  and using the alternatives.
 - A method that adds obligations before an admission rejection still has them
   selected, so the replan does not lose the work it discovered (#594).
+- The rejection keeps the method eligible; it does not force the planner to
+  choose it again, since changed availability, costs or goals can select another
+  admissible method.
+- Execution reports 1.0.0 remain readable as historical records; new reports
+  use 1.1.0. A 0.3.29 core cannot read a 0.3.30 execution checkpoint with
+  `failure_kind`, so rolling back discards the plan/execution checkpoints and
+  starts fresh.
 - Region and page inspection return the typed kind instead of a generic
   failure when the local runner rejects the call.
 - The PDDL domain and the Core–Toolbox contracts do not change.

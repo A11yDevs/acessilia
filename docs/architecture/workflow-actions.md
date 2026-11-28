@@ -555,9 +555,15 @@ and records no method attempt, so the replan keeps the method available and
 runs the step again for the objects still pending, within `max_replans`.
 A deferred action spends the failure recovery budget, not the discovery one;
 when that budget is spent the open obligation follows the delivery policy (a
-critical one fails the job), and a rerun can retry it. Provider
-unavailability, a timeout and an insufficient answer stay ordinary method
-failures: they are recorded as tried and the replan may use another method.
+critical one fails the job), and a rerun can retry it. The plan checkpoint
+records the deferred ids (`admission_deferred_ids`), so a plan replacement or
+resume keeps the same budget; a checkpoint before the field restores none, and
+the current execution report contributes its deferrals. The rejection keeps
+the method eligible; it does not force the planner to choose it again, since
+changed availability, costs or goals can legitimately select another admissible
+method. Provider unavailability, a timeout and an insufficient answer stay
+ordinary method failures: they are recorded as tried and the replan may use
+another method.
 `ExecutionStepResult.failure_kind` exposes the distinction in the
 execution report; the PDDL domain and the Core–Toolbox contracts do not
 change. A closed runner is lifecycle, not capacity pressure, and stays an

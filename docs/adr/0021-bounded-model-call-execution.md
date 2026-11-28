@@ -88,9 +88,18 @@ Inside a plan, the document enrichment methods carry it as
 `MethodResult.failure_kind="admission_rejected"`; the executor reports it in
 `ExecutionStepResult.failure_kind`, keeps the obligation pending without
 recording the method as tried, and the replanner retries the same action within
-`max_replans` (#828). A deferred action spends the failure recovery budget, not
-the discovery one; when that budget is spent the open obligation follows the
-delivery policy (a critical one fails the job), and a rerun can retry it.
+`max_replans` (#828). The rejection keeps the method eligible; it does not force
+the planner to choose it again, because changed availability, costs or goals can
+legitimately select another admissible method. A deferred action spends the
+failure recovery budget, not the discovery one; when that budget is spent the
+open obligation follows the delivery policy (a critical one fails the job), and
+a rerun can retry it. The plan checkpoint records the deferred ids
+(`admission_deferred_ids`) so a plan replacement or resume keeps the same
+budget; a checkpoint from before the field restores none, and the current
+execution report contributes the deferrals it holds. Execution reports 1.0.0
+remain readable as historical records, while new reports use 1.1.0. A 0.3.29
+core cannot read a 0.3.30 execution checkpoint that carries `failure_kind`, so
+a rollback discards the plan/execution checkpoints and starts fresh.
 Provider unavailability, timeouts and insufficient answers remain ordinary
 method failures with their own recovery policy.
 A closed runner raises the `ModelCallClosed` subtype instead: it is lifecycle,

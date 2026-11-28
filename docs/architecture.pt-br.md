@@ -94,7 +94,9 @@ a execução fora do cache para que uma nova execução a retente. Dentro de um
 plano, os métodos de enriquecimento tipam esse motivo como
 `failure_kind="admission_rejected"`; o executor mantém a obrigação pendente sem
 registrar o método como tentado, e o replanejador repete a mesma ação dentro do
-orçamento de recuperação de falhas, não o de discovery (#828).
+orçamento de recuperação de falhas, não o de discovery (#828); o checkpoint do
+plano mantém os ids adiados através da troca de plano ou retomada. O método
+continua elegível, mas o planejador pode escolher outro admissível.
 Indisponibilidade do provider, timeout e resposta insuficiente continuam
 falhas comuns. Fechar o runner gera o subtipo
 `ModelCallClosed`; os agentes não o retentam e as etapas abortam, porque

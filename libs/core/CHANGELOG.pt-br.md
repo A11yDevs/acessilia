@@ -21,12 +21,21 @@ agora distingue os casos.
   método continua disponível, então o replanejamento o repete para os objetos
   ainda pendentes dentro de `max_replans`. Uma ação adiada gasta o orçamento de
   recuperação de falhas, não o de discovery; esgotado esse orçamento, a
-  obrigação aberta segue a política de entrega (uma crítica falha o job). Um
-  runner fechado continua sendo falha de execução; indisponibilidade do
-  provider, timeout e resposta insuficiente mantêm a política de registrar o
-  método como tentado e usar as alternativas.
+  obrigação aberta segue a política de entrega (uma crítica falha o job). O
+  checkpoint do plano registra os ids adiados (`admission_deferred_ids`), então
+  a troca de plano ou a retomada mantém o orçamento; checkpoints anteriores ao
+  campo não restauram nenhum. Um runner fechado continua sendo falha de
+  execução; indisponibilidade do provider, timeout e resposta insuficiente
+  mantêm a política de registrar o método como tentado e usar as alternativas.
 - Um método que adiciona obrigações antes de uma rejeição de admissão ainda as
   seleciona, então o replanejamento não perde o trabalho descoberto (#594).
+- A rejeição mantém o método elegível; ela não força o planejador a escolhê-lo
+  de novo, porque mudanças de disponibilidade, custos ou metas podem selecionar
+  outro método admissível.
+- Relatórios de execução 1.0.0 continuam legíveis como registros históricos; os
+  novos usam 1.1.0. Um core 0.3.29 não lê um checkpoint de execução 0.3.30 com
+  `failure_kind`, então um rollback descarta os checkpoints de plano/execução e
+  começa do zero.
 - A inspeção de região e de página retorna o tipo em vez de uma falha genérica
   quando o runner local rejeita a chamada.
 - O domínio PDDL e os contratos Core–Toolbox não mudam.
