@@ -67,18 +67,29 @@ variável não está definida ou vale -1 (no mínimo os 4 históricos) e avisa n
 recusá-lo, quando um valor explícito não cobre os jobs configurados. O aviso
 nomeia a capacidade pendente exata que fecha a lacuna. Ficar acima da capacidade
 é um modo degradado, não inseguro, e as etapas podem usar menos chamadas que seu
-limite. A fórmula pressupõe que os subplanos de enriquecimento de um job sejam
-sequenciais, de modo que um limite de etapa valha por vez; subplanos paralelos
-exigiriam um novo orçamento agregado (#828). Dimensionar a capacidade de admissão
-não torna a execução de vários jobs segura, por isso `QUEUE_MAX_CONCURRENT` acima
-de 1 continua atrás do opt-in explícito `QUEUE_MULTI_JOB_EXPERIMENTAL=true` até
-que a #238 W1 forneça a justiça por origem, a API pública de cancelamento e as
-decisões de isolamento de memória/falhas (#830). A validação da configuração, a
-fábrica e o construtor da fila aplicam a mesma invariante. A fórmula é nominal e
-local à instância da fila: a sobreposição de cancelamento pode manter um item
-extra em processamento, e uma segunda réplica tem sua própria fila, então não é
-um limite entre réplicas. A configuração do processo registra um aviso quando o
-modo experimental é autorizado, não uma vez por fila ou por job.
+limite. Esse produto descreve um job cujas etapas de enriquecimento permanecem
+sequenciais: imagens e fórmulas usam cada uma um semáforo `VISION_CONCURRENCY` e
+as tabelas rodam uma por vez, então no máximo `VISION_CONCURRENCY` chamadas ficam
+em voo para esse job. `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` é o pior caso
+do processo sob essa premissa, não o pico de uma etapa nem uma demanda medida
+(#831). Se a execução PDDL passar a rodar subplanos de enriquecimento em
+paralelo, as chamadas em voo deles se somam e a premissa deixa de descrever a
+demanda; revise o modelo de capacidade antes de habilitá-los. Prefira um único
+orçamento agregado de chamadas por job, compartilhado pelos subplanos, com
+`MODEL_CALL_WORKERS` ainda limitando o processo, a dar a cada subplano um
+executor ou uma fila independente e multiplicar a capacidade. Com esse
+orçamento, derive a capacidade pendente dele e da concorrência da fila; até
+existir, a fórmula nesta ADR vale apenas para enriquecimento sequencial.
+Dimensionar a capacidade de admissão não torna a execução de vários jobs segura,
+por isso `QUEUE_MAX_CONCURRENT` acima de 1 continua atrás do opt-in explícito
+`QUEUE_MULTI_JOB_EXPERIMENTAL=true` até que a #238 W1 forneça a justiça por
+origem, a API pública de cancelamento e as decisões de isolamento de
+memória/falhas (#830). A validação da configuração, a fábrica e o construtor da
+fila aplicam a mesma invariante. A fórmula é nominal e local à instância da
+fila: a sobreposição de cancelamento pode manter um item extra em processamento,
+e uma segunda réplica tem sua própria fila, então não é um limite entre réplicas.
+A configuração do processo registra um aviso quando o modo experimental é
+autorizado, não uma vez por fila ou por job.
 
 Uma rejeição é pressão de admissão, não saúde do provider. Ela é tentada uma vez
 de novo, como um timeout, sem consumir uma tentativa de resposta; se persistir, a

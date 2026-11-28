@@ -83,9 +83,14 @@ immediately counts toward saturation.
 
 Capacity that cannot admit the configured jobs is reported once at startup,
 without refusing it: `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` must not exceed
-`MODEL_CALL_WORKERS + MODEL_CALL_MAX_PENDING`. A rejection is local admission
-pressure, not provider health: the agents retry it once like a timeout, without
-consuming an answer attempt. If it persists, the stage records
+`MODEL_CALL_WORKERS + MODEL_CALL_MAX_PENDING`. The product assumes one enrichment
+stage per job at a time (pictures and formulas each use one stage semaphore; tables
+run sequentially), so it is the nominal process worst case, not a measured peak.
+Parallel enrichment subplans would add their in-flight calls; before enabling
+them, give each job one aggregate model-call budget and size the pending capacity
+from it instead of multiplying executors or queues (#831). A rejection is local
+admission pressure, not provider health: the agents retry it once like a
+timeout, without consuming an answer attempt. If it persists, the stage records
 `admission_rejected`, leaves the shared provider breaker untouched, and keeps the
 run out of the cache so a rerun can retry it. Inside a plan, the enrichment
 methods type that reason as `failure_kind="admission_rejected"`; the executor

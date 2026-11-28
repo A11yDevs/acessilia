@@ -86,7 +86,13 @@ para a saturação.
 
 Capacidade que não admite os jobs configurados é informada uma vez no startup,
 sem recusá-la: `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` não deve exceder
-`MODEL_CALL_WORKERS + MODEL_CALL_MAX_PENDING`. Uma rejeição é pressão de admissão
+`MODEL_CALL_WORKERS + MODEL_CALL_MAX_PENDING`. O produto pressupõe uma etapa de
+enriquecimento por job de cada vez (imagens e fórmulas usam cada uma um semáforo
+de etapa; tabelas rodam sequencialmente), então é o pior caso nominal do
+processo, não um pico medido. Subplanos de enriquecimento paralelos somariam suas
+chamadas em voo; antes de habilitá-los, dê a cada job um único orçamento
+agregado de chamadas e dimensione a capacidade pendente a partir dele, em vez de
+multiplicar executores ou filas (#831). Uma rejeição é pressão de admissão
 local, não saúde do provider: os agentes a tentam de novo uma vez, como um
 timeout, sem consumir uma tentativa de resposta. Se persistir, a etapa registra
 `admission_rejected`, deixa o breaker compartilhado do provider intacto e mantém
